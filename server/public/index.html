@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+		<title>OneDay · 物品生命周期</title>
+		<link rel="icon" href="data:;base64,=">
+		<link rel="stylesheet" href="public/vuetify-3.11.5/dist/vuetify.css" />
+		<link rel="stylesheet" href="public/font-7.4.47/css/materialdesignicons.min.css" />
+		<style>
+			html, body, #app { height: 100%; margin: 0; }
+			body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+			/* 渐变背景层（首页氛围）*/
+			.gradient-header {
+				background: linear-gradient(160deg, #ffe5ec 0%, #fff0f5 60%, #fef6f9 100%);
+			}
+			.cost-accent { color: #ff7f9d; font-weight: 700; }
+			.status-dot {
+				display: inline-block;
+				width: 10px; height: 10px; border-radius: 50%;
+				box-shadow: 0 0 0 2px #fff;
+			}
+			.status-using   { background: #5cd28a; }
+			.status-retired { background: #f0b860; }
+			.status-sold    { background: #b4b8c2; }
+			.item-card { cursor: pointer; transition: transform 0.15s ease; }
+			.item-card:active { transform: scale(0.98); }
+		</style>
+	</head>
+	<body>
+		<!-- ===== Vendor 库（顺序很重要：vue → vuetify → router → demi → pinia → cryptojs）===== -->
+		<script src="public/vue-3.5.26/dist/vue.global.js"></script>
+		<script src="public/vuetify-3.11.5/dist/vuetify.js"></script>
+		<script src="public/vue-router-4.6.4/vue-router.global.js"></script>
+		<script src="public/vue-demi-0.14.10/lib/index.iife.js"></script>
+		<script src="public/pinia-2.3.1/dist/pinia.iife.js"></script>
+		<script src="public/crypto-js-4.2.0/crypto-js.js"></script>
+
+		<!-- ===== 业务页面（每个 .js 定义一个全局组件变量）===== -->
+		<script src="public/Home.js"></script>
+		<script src="public/Library.js"></script>
+		<script src="public/Charts.js"></script>
+		<script src="public/Settings.js"></script>
+		<script src="public/ItemAdd.js"></script>
+		<script src="public/ItemDetail.js"></script>
+		<script src="public/zh-Hans.js"></script>
+
+		<div id="app">
+			<v-app>
+				<!-- 主内容区 -->
+				<v-main>
+					<v-container fluid class="pa-0">
+						<router-view />
+					</v-container>
+				</v-main>
+
+				<!-- 底部悬浮导航（4 个 tab + 黑色 FAB 加号）-->
+				<div class="floating-bar">
+					<v-card class="capsule-nav rounded-pill px-1 py-1 d-flex align-center" elevation="6">
+						<v-btn
+							v-for="tab in tabs"
+							:key="tab.name"
+							:to="tab.path"
+							variant="text"
+							size="small"
+							rounded="pill"
+							class="flex-grow-1 nav-item"
+							:active="$route.path === tab.path"
+						>
+							<v-icon :icon="tab.icon"></v-icon>
+							<span class="nav-label">{{ tab.label }}</span>
+						</v-btn>
+					</v-card>
+					<v-btn
+						class="ml-3 fab-add"
+						icon="mdi-plus"
+						color="black"
+						size="large"
+						@click="$router.push('/item/add')"
+						elevation="8"
+					></v-btn>
+				</div>
+			</v-app>
+		</div>
+
+		<style>
+			.floating-bar {
+				position: fixed; left: 16px; right: 16px;
+				bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+				display: flex; align-items: center; z-index: 100;
+				pointer-events: none;
+			}
+			.capsule-nav {
+				pointer-events: auto;
+				flex: 1;
+				background: rgba(255, 255, 255, 0.95) !important;
+				backdrop-filter: saturate(180%) blur(20px);
+			}
+			.nav-item { min-width: 0 !important; flex-direction: column; height: 48px !important; }
+			.nav-label { font-size: 11px; line-height: 1; margin-top: 2px; }
+			.fab-add { pointer-events: auto; }
+			/* 给所有页面底部留出 nav 高度的空间 */
+			.v-main { padding-bottom: 92px !important; }
+		</style>
+
+		<script defer>
+			const { createApp, ref, reactive, computed, onMounted, watch, nextTick, onUnmounted } = Vue;
+			const { createVuetify } = Vuetify;
+			const { defineStore, createPinia } = Pinia;
+
+			// ===== 全局 store：留着以后做主题色 / 当前用户等 =====
+			const useAppStore = defineStore("app", () => {
+				const drawer = ref(false);
+				const accent = ref("#ff7f9d");
+				return { drawer, accent };
+			});
+
+			// ===== 路由 =====
+			const routes = [
+				{ path: "/",          component: Home,        name: "home" },
+				{ path: "/library",   component: Library,     name: "library" },
+				{ path: "/charts",    component: Charts,      name: "charts" },
+				{ path: "/settings",  component: Settings,    name: "settings" },
+				{ path: "/item/add",  component: ItemAdd,     name: "item-add" },
+				{ path: "/item/:id",  component: ItemDetail,  name: "item" },
+			];
+			const router = VueRouter.createRouter({
+				history: VueRouter.createWebHashHistory(),
+				routes,
+			});
+
+			// ===== Vuetify =====
+			const vuetify = createVuetify({
+				locale: { locale: "zhHans", messages: { zhHans } },
+				theme: { defaultTheme: "light" },
+				icons: { defaultSet: "mdi" },
+			});
+
+			// ===== 应用根 =====
+			createApp({
+				setup() {
+					const tabs = [
+						{ name: "home",     path: "/",         label: "首页",   icon: "mdi-home-outline" },
+						{ name: "library",  path: "/library",  label: "物品库", icon: "mdi-apps" },
+						{ name: "charts",   path: "/charts",   label: "图表",   icon: "mdi-chart-bar" },
+						{ name: "settings", path: "/settings", label: "设置",   icon: "mdi-cog-outline" },
+					];
+					return { tabs };
+				}
+			})
+				.use(createPinia())
+				.use(vuetify)
+				.use(router)
+				.mount("#app");
+		</script>
+	</body>
+</html>

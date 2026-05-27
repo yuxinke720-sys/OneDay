@@ -1,0 +1,35 @@
+// Vuetify 简体中文 locale（极简版，覆盖最常用的几个）
+const zhHans = {
+	badge: "徽章",
+	close: "关闭",
+	dataIterator: {
+		noResultsText: "没有找到符合条件的结果",
+		loadingText: "加载中...",
+	},
+	dataTable: {
+		itemsPerPageText: "每页：",
+		ariaLabel: { sortDescending: "倒序排列", sortAscending: "正序排列", sortNone: "未排序", activateNone: "点击移除排序", activateDescending: "点击降序排列", activateAscending: "点击升序排列" },
+		sortBy: "排序",
+	},
+	dataFooter: {
+		itemsPerPageText: "每页：",
+		itemsPerPageAll: "所有",
+		nextPage: "下一页",
+		prevPage: "上一页",
+		firstPage: "首页",
+		lastPage: "尾页",
+		pageText: "{0}-{1} 共 {2} 条",
+	},
+	datePicker: { itemsSelected: "已选择 {0} 个", nextMonthAriaLabel: "下个月", nextYearAriaLabel: "下一年", prevMonthAriaLabel: "上个月", prevYearAriaLabel: "上一年" },
+	noDataText: "没有数据",
+	carousel: { prev: "上一张", next: "下一张", ariaLabel: { delimiter: "幻灯片 {0} of {1}" } },
+	calendar: { moreEvents: "还有 {0} 项" },
+	input: { clear: "清空 {0}", prependAction: "{0} 前置操作", appendAction: "{0} 后置操作", otp: "请输入 OTP 字符 {0}" },
+	fileInput: { counter: "{0} 个文件", counterSize: "{0} 个文件 (共 {1})" },
+	timePicker: { am: "上午", pm: "下午" },
+	pagination: { ariaLabel: { root: "分页导航", next: "下一页", previous: "上一页", page: "前往第 {0} 页", currentPage: "当前页，第 {0} 页", first: "首页", last: "尾页" } },
+	stepper: { next: "下一步", prev: "上一步" },
+	rating: { ariaLabel: { item: "{0} 颗星，共 {1} 颗" } },
+	loading: "加载中...",
+	infiniteScroll: { loadMore: "加载更多", empty: "没有更多了" },
+};

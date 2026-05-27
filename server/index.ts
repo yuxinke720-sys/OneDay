@@ -14,11 +14,17 @@ import { join, extname } from 'node:path';
 config();
 
 const UPLOADS_DIR = './uploads';
+const PUBLIC_DIR  = './public';
 await mkdir(UPLOADS_DIR, { recursive: true });
 
 const app = new Elysia()
   .use(cors({ origin: '*' }))
+  // 静态资源：前端页面 + vendor 库（Vue / Vuetify / Pinia 等）
+  .use(staticPlugin({ assets: PUBLIC_DIR, prefix: '/public' }))
+  // 上传图片
   .use(staticPlugin({ assets: UPLOADS_DIR, prefix: '/uploads' }))
+  // 根路径返回首页（前端单页入口）
+  .get('/', () => Bun.file('./public/index.html'))
   .get('/health', () => ({ code: 200, data: 'ok' }))
 
   // ========== Items ==========

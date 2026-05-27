@@ -33,6 +33,22 @@ OneDay/
 CREATE DATABASE oneday;
 ```
 
+## 日常启动（已经搭好环境后）
+
+**Windows**（3 个动作）：
+1. 双击 `postgresql-.../startPG.bat` 启动 PG
+2. 双击 `bun-windows-x64/StartBun.bat` → 进 server → `bun start`
+3. 再双击 `StartBun.bat` → 进 web → `bun run dev`
+4. 浏览器 http://localhost:5173
+
+**macOS**（PG 已自启）：
+```bash
+# 终端 1
+cd server && bun run dev
+# 终端 2
+cd web && bun run dev
+```
+
 ## 二、首次运行
 
 ```bash
@@ -42,7 +58,7 @@ cd OneDay
 
 # 2. 后端
 cd server
-bun install
+bun install --ignore-scripts     # ⚠️ Windows 必须加 --ignore-scripts
 cp .env.example .env             # mac/linux
 # Copy-Item .env.example .env    # windows powershell
 # 编辑 .env，填上 DB_PASSWORD 和 DB_NAME=oneday
@@ -52,9 +68,15 @@ bun run dev                      # 启动 :3000
 
 # 3. 前端（开新终端）
 cd ../web
-bun install
+bun install --ignore-scripts     # ⚠️ Windows 必须加 --ignore-scripts
 bun run dev                      # 启动 :5173
 ```
+
+### 为什么 `--ignore-scripts`？
+
+某些 npm 包（esbuild、vue-demi 等）会在安装时跑 `node xxx.js` 的 postinstall
+脚本——而 Windows 课程环境只装了 Bun、没装 Node.js。`--ignore-scripts`
+让 Bun 跳过这些脚本，二进制依赖照样能正确安装。Mac 上加不加都不影响。
 
 浏览器打开 [http://localhost:5173](http://localhost:5173) ✨
 

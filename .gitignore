@@ -6,9 +6,10 @@ node_modules/
 dist/
 out/
 *.tsbuildinfo
-# vue-tsc 类型检查时编译 vite.config.ts 产生的临时文件
-web/vite.config.js
-web/vite.config.d.ts
+# 但是！server/public/ 下的 vendor 库（vue/vuetify/...）也叫 dist/
+# 这些是要入仓的，否则别的机器拉下来跑不起来
+!server/public/**/dist/
+!server/public/**/dist/**
 
 # ===== 环境变量（含密码，不入仓）=====
 .env
