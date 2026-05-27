@@ -8,6 +8,7 @@
     "start": "bun run index.ts",
     "init-db": "bun run init-db.ts"
   },
+  "trustedDependencies": [],
   "devDependencies": {
     "@types/bun": "latest"
   },
