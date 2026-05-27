@@ -1,0 +1,17 @@
+# 跨平台规范：所有文本文件统一用 LF 行尾，避免 Mac/Windows 切换时整屏 diff
+* text=auto eol=lf
+
+# 二进制文件，git 不要做行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.exe binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

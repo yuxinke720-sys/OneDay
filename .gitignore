@@ -1,0 +1,33 @@
+# ===== Bun / Node 依赖 =====
+node_modules/
+.bun-cache/
+
+# ===== 构建产物 =====
+dist/
+out/
+*.tsbuildinfo
+# vue-tsc 类型检查时编译 vite.config.ts 产生的临时文件
+web/vite.config.js
+web/vite.config.d.ts
+
+# ===== 环境变量（含密码，不入仓）=====
+.env
+.env.local
+.env.*.local
+
+# ===== 上传文件不入仓（保留 .gitkeep 占位）=====
+server/uploads/*
+!server/uploads/.gitkeep
+
+# ===== Vant 自动生成的类型文件 =====
+web/src/components.d.ts
+
+# ===== IDE / 系统垃圾文件 =====
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.cache/
