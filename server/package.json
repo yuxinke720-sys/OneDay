@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bun run --watch index.ts",
     "start": "bun run index.ts",
-    "init-db": "bun run init-db.ts"
+    "init-db": "bun run init-db.ts",
+    "migrate": "bun run migrate.ts"
   },
   "trustedDependencies": [],
   "devDependencies": {
