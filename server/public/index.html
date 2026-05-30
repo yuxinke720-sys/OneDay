@@ -36,7 +36,12 @@
 		<script src="public/pinia-2.3.1/dist/pinia.iife.js"></script>
 		<script src="public/crypto-js-4.2.0/crypto-js.js"></script>
 
+		<!-- ===== 鉴权工具（必须在业务页面之前）===== -->
+		<script src="public/Auth.js"></script>
+
 		<!-- ===== 业务页面（每个 .js 定义一个全局组件变量）===== -->
+		<script src="public/Login.js"></script>
+		<script src="public/Register.js"></script>
 		<script src="public/Home.js"></script>
 		<script src="public/Library.js"></script>
 		<script src="public/Charts.js"></script>
@@ -54,8 +59,8 @@
 					</v-container>
 				</v-main>
 
-				<!-- 底部悬浮导航（4 个 tab + 黑色 FAB 加号）-->
-				<div class="floating-bar">
+				<!-- 底部悬浮导航（4 个 tab + 黑色 FAB 加号）；登录/注册页 + 批量选择模式 都隐藏 -->
+				<div class="floating-bar" v-if="!isAuthRoute && !ui.batchMode && !isFormRoute">
 					<v-card class="capsule-nav rounded-pill px-1 py-1 d-flex align-center" elevation="6">
 						<v-btn
 							v-for="tab in tabs"
@@ -101,6 +106,244 @@
 			.fab-add { pointer-events: auto; }
 			/* 给所有页面底部留出 nav 高度的空间 */
 			.v-main { padding-bottom: 92px !important; }
+
+			/* ===== ItemAdd 表单页（图5 风格）===== */
+			.iadd-page { padding-bottom: 120px; min-height: 100vh; background: #f5f5f7; }
+			.iadd-kind-toggle .v-btn { letter-spacing: 4px; font-size: 1rem; }
+			.iadd-kind-btn { min-width: 56px !important; }
+			.iadd-kind-btn.v-btn--active { font-weight: 800; border-bottom: 3px solid #ff7f9d; border-radius: 0 !important; }
+
+			.iadd-icon-wrap {
+				position: relative;
+				width: 72px; height: 72px;
+				cursor: pointer;
+			}
+			.iadd-icon-edit {
+				position: absolute;
+				right: -2px; bottom: -2px;
+				width: 22px; height: 22px;
+				background: #777;
+				border-radius: 50%;
+				border: 2px solid #fff;
+				display: flex; align-items: center; justify-content: center;
+			}
+			.iadd-name-input {
+				display: block;
+				width: 100%;
+				max-width: 280px;
+				margin: 12px auto 0;
+				border: none;
+				background: transparent;
+				outline: none;
+				text-align: center;
+				font-size: 1rem;
+				color: #888;
+				padding: 4px 0;
+			}
+			.iadd-name-input::placeholder { color: #c4c4c4; }
+			.iadd-name-input:focus { color: #000; }
+
+			.iadd-row {
+				display: flex;
+				align-items: center;
+				min-height: 52px;
+				padding: 4px 16px;
+				cursor: default;
+			}
+			.iadd-label { font-size: 0.95rem; color: #333; }
+			.iadd-input-right {
+				flex: 1;
+				min-width: 0;
+				border: none;
+				background: transparent;
+				outline: none;
+				text-align: right;
+				font-size: 0.95rem;
+				color: #000;
+				padding: 0;
+			}
+			.iadd-input-right::placeholder { color: #c4c4c4; }
+			.iadd-value-right {
+				flex: 1;
+				text-align: right;
+				font-size: 0.95rem;
+				color: #333;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.iadd-divider { margin-left: 50px !important; opacity: 0.5; }
+
+			.iadd-target-toggle .v-btn {
+				border-radius: 999px !important;
+				font-size: 0.85rem;
+				letter-spacing: 0.5px;
+			}
+
+			.iadd-sub-name {
+				flex: 1; min-width: 0;
+				border: 1px solid #e0e0e0; border-radius: 8px;
+				padding: 8px 10px;
+				outline: none; font-size: 0.9rem;
+				background: #fff;
+			}
+			.iadd-sub-price {
+				width: 80px;
+				border: 1px solid #e0e0e0; border-radius: 8px;
+				padding: 8px 10px;
+				outline: none; font-size: 0.9rem;
+				text-align: right;
+				background: #fff;
+			}
+
+			.iadd-bottom-bar {
+				position: fixed; left: 16px; right: 16px;
+				bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+				z-index: 100;
+			}
+			.iadd-bottom-bar .v-btn { letter-spacing: 4px; font-weight: 600; }
+
+			/* 批量选择模式：顶部 toolbar 替代粉色 header */
+			.batch-header {
+				position: sticky; top: 0;
+				z-index: 50;
+				min-height: 56px;
+				background: #fff;
+				border-bottom: 1px solid rgba(0,0,0,0.06);
+			}
+			/* 批量选中卡片：黑色描边 + 轻微放大 */
+			.item-card-selected {
+				outline: 2px solid #000;
+				outline-offset: -2px;
+			}
+			/* 批量底部动作栏 */
+			.batch-action-bar {
+				position: fixed; left: 16px; right: 16px;
+				bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+				z-index: 110;
+			}
+			.batch-action-bar > .v-card {
+				background: rgba(255,255,255,0.98) !important;
+				backdrop-filter: saturate(180%) blur(20px);
+			}
+			.batch-action-btn {
+				flex: 1; min-width: 0 !important;
+				flex-direction: column !important;
+				height: 56px !important;
+				letter-spacing: 0.5px;
+			}
+			/* 分类弹窗的行（48px 行高，可点）*/
+			.category-row {
+				min-height: 52px;
+				padding: 4px 4px;
+				cursor: pointer;
+				transition: background-color .15s ease;
+			}
+			.category-row:active { background-color: rgba(0,0,0,0.03); }
+			/* 状态弹窗的行 */
+			.status-action-row {
+				display: flex; align-items: center;
+				min-height: 56px;
+				padding: 0 24px;
+				cursor: pointer;
+				transition: background-color .15s ease;
+				border-bottom: 1px solid rgba(0,0,0,0.04);
+			}
+			.status-action-row:last-child { border-bottom: none; }
+			.status-action-row:active { background-color: rgba(0,0,0,0.04); }
+
+			/* 首页分类筛选条：加粗 + 加大一号（与下方状态条形成层级对比）*/
+			.category-chip {
+				font-size: 0.95rem !important;
+				font-weight: 600 !important;
+				height: 36px !important;
+				padding: 0 14px !important;
+				letter-spacing: 0.5px;
+			}
+
+			/* Settings 头像：右下角小相机叠加 */
+			.profile-avatar-wrap {
+				position: relative;
+				width: 72px; height: 72px;
+				cursor: pointer;
+				flex-shrink: 0;
+			}
+			.profile-avatar-edit {
+				position: absolute;
+				right: 0; bottom: 0;
+				width: 24px; height: 24px;
+				background: #ff7f9d;
+				border-radius: 50%;
+				border: 2px solid #fff;
+				display: flex; align-items: center; justify-content: center;
+			}
+			.profile-avatar-loader {
+				position: absolute;
+				top: 0; left: 0;
+			}
+
+			/* 登录/注册页 */
+			.auth-bg {
+				min-height: 100vh;
+				background: linear-gradient(160deg, #ffe5ec 0%, #fff0f5 55%, #ffffff 100%);
+			}
+			.auth-card {
+				width: 100%;
+				max-width: 400px;
+				background: rgba(255, 255, 255, 0.98);
+			}
+			.auth-logo {
+				width: 64px; height: 64px; border-radius: 18px;
+				background: linear-gradient(135deg, #ff7f9d, #ff5f87);
+				display: flex; align-items: center; justify-content: center;
+				box-shadow: 0 6px 20px rgba(255, 95, 135, 0.35);
+			}
+			.auth-cta {
+				letter-spacing: 4px;
+				box-shadow: 0 4px 14px rgba(236, 64, 122, 0.35) !important;
+			}
+			/* 排序弹窗：顶部操作栏（取消 / 标题 / 确定）*/
+			.sort-header {
+				min-height: 60px;
+				padding-top: 8px;
+				padding-bottom: 8px;
+			}
+			.sort-header-divider {
+				height: 1px;
+				background-color: rgba(0, 0, 0, 0.06);
+			}
+			/* 取消按钮：弱，给确定让位 */
+			.sort-cancel-btn {
+				letter-spacing: 0.5px;
+				opacity: 0.75;
+			}
+			/* 确定按钮：强，主要 CTA */
+			.sort-confirm-btn {
+				letter-spacing: 1px;
+				font-weight: 600 !important;
+				padding-left: 18px !important;
+				padding-right: 18px !important;
+				box-shadow: 0 4px 14px rgba(236, 64, 122, 0.35) !important;
+			}
+			.sort-confirm-btn:active {
+				box-shadow: 0 2px 6px rgba(236, 64, 122, 0.4) !important;
+				transform: translateY(1px);
+			}
+			/* 排序弹窗：极简两端对齐行 */
+			.sort-row {
+				min-height: 52px;
+				padding: 4px 0;
+				cursor: pointer;
+				transition: background-color 0.15s ease;
+			}
+			.sort-row:active { background-color: rgba(0, 0, 0, 0.03); }
+			/* 极弱的逻辑切割线：1px、低不透明度、左右留白 */
+			.sort-section-divider {
+				height: 1px;
+				background-color: rgba(0, 0, 0, 0.06);
+				margin: 6px 20px;
+			}
 		</style>
 
 		<script defer>
@@ -108,25 +351,42 @@
 			const { createVuetify } = Vuetify;
 			const { defineStore, createPinia } = Pinia;
 
-			// ===== 全局 store：留着以后做主题色 / 当前用户等 =====
+			// ===== 全局 store：UI 状态（批量选择模式等）=====
 			const useAppStore = defineStore("app", () => {
 				const drawer = ref(false);
 				const accent = ref("#ff7f9d");
-				return { drawer, accent };
+				const batchMode = ref(false);     // 批量选择模式（开启时隐藏底部胶囊导航）
+				return { drawer, accent, batchMode };
 			});
 
 			// ===== 路由 =====
 			const routes = [
+				{ path: "/login",     component: Login,       name: "login",    meta: { public: true } },
+				{ path: "/register",  component: Register,    name: "register", meta: { public: true } },
 				{ path: "/",          component: Home,        name: "home" },
 				{ path: "/library",   component: Library,     name: "library" },
 				{ path: "/charts",    component: Charts,      name: "charts" },
 				{ path: "/settings",  component: Settings,    name: "settings" },
-				{ path: "/item/add",  component: ItemAdd,     name: "item-add" },
-				{ path: "/item/:id",  component: ItemDetail,  name: "item" },
+				{ path: "/item/add",       component: ItemAdd,     name: "item-add"  },
+				{ path: "/item/:id/edit",  component: ItemAdd,     name: "item-edit" },
+				{ path: "/item/:id",       component: ItemDetail,  name: "item"      },
 			];
 			const router = VueRouter.createRouter({
 				history: VueRouter.createWebHashHistory(),
 				routes,
+			});
+
+			// ===== 全局登录守卫 =====
+			// 注意：守卫里用 store 必须 先 createPinia + 注入到 app 之后才能 useStore，
+			// 所以这里只把守卫"注册"，hydrate/检查放在 router.beforeEach 里运行时执行。
+			router.beforeEach((to, _from, next) => {
+				const auth = useAuthStore();
+				// 首次访问时，从 localStorage 恢复登录态（幂等）
+				if (auth.token === null) auth.hydrate();
+
+				if (to.meta?.public) return next();
+				if (!auth.isLoggedIn)  return next({ name: "login", query: { redirect: to.fullPath } });
+				next();
 			});
 
 			// ===== Vuetify =====
@@ -145,7 +405,15 @@
 						{ name: "charts",   path: "/charts",   label: "图表",   icon: "mdi-chart-bar" },
 						{ name: "settings", path: "/settings", label: "设置",   icon: "mdi-cog-outline" },
 					];
-					return { tabs };
+					const route = VueRouter.useRoute();
+					const isAuthRoute = computed(() =>
+						route.name === "login" || route.name === "register"
+					);
+					const isFormRoute = computed(() =>
+						route.name === "item-add" || route.name === "item-edit"
+					);
+					const ui = useAppStore();
+					return { tabs, isAuthRoute, isFormRoute, ui };
 				}
 			})
 				.use(createPinia())

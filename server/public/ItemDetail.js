@@ -16,7 +16,7 @@ const ItemDetail = {
 				</div>
 				<div style="position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between;">
 					<v-btn icon="mdi-arrow-left" size="small" color="white" @click="$router.back()"></v-btn>
-					<v-btn icon="mdi-delete-outline" size="small" color="white" @click="onDeleteItem"></v-btn>
+					<v-btn icon="mdi-pencil-outline" size="small" color="white" @click="onEditItem"></v-btn>
 				</div>
 				<v-chip
 					:color="statusColor"
@@ -194,9 +194,9 @@ const ItemDetail = {
 			const id = itemId.value;
 			try {
 				const [r1, r2, r3] = await Promise.all([
-					fetch("/api/items/" + id).then(r => r.json()),
-					fetch("/api/items/" + id + "/events").then(r => r.json()),
-					fetch("/api/items/" + id + "/stats").then(r => r.json()),
+					authFetch("/api/items/" + id).then(r => r.json()),
+					authFetch("/api/items/" + id + "/events").then(r => r.json()),
+					authFetch("/api/items/" + id + "/stats").then(r => r.json()),
 				]);
 				if (r1.code === 200) item.value   = r1.data;
 				if (r2.code === 200) events.value = r2.data;
@@ -209,7 +209,7 @@ const ItemDetail = {
 		async function quickUse() {
 			quickUsing.value = true;
 			try {
-				const r = await fetch("/api/items/" + itemId.value + "/events", {
+				const r = await authFetch("/api/items/" + itemId.value + "/events", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ type: "usage", occurred_at: new Date().toISOString() }),
@@ -225,7 +225,7 @@ const ItemDetail = {
 		// 删事件
 		async function onDeleteEvent(eid) {
 			if (!confirm("删除这条事件？统计会随之更新")) return;
-			const r = await fetch("/api/events/" + eid, { method: "DELETE" });
+			const r = await authFetch("/api/events/" + eid, { method: "DELETE" });
 			const j = await r.json();
 			if (j.code === 200) await loadAll();
 		}
@@ -239,7 +239,7 @@ const ItemDetail = {
 		async function submitEvent() {
 			adding.value = true;
 			try {
-				const r = await fetch("/api/items/" + itemId.value + "/events", {
+				const r = await authFetch("/api/items/" + itemId.value + "/events", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
@@ -259,15 +259,9 @@ const ItemDetail = {
 			} finally { adding.value = false; }
 		}
 
-		// 删除整个物品
-		async function onDeleteItem() {
-			if (!confirm("删除「" + item.value?.name + "」？所有事件和图片都会一起删除")) return;
-			const r = await fetch("/api/items/" + itemId.value, { method: "DELETE" });
-			const j = await r.json();
-			if (j.code === 200) {
-				showMsg("已删除");
-				setTimeout(() => router.replace({ name: "home" }), 600);
-			}
+		// 跳到编辑页（复用 ItemAdd 组件的编辑模式）
+		function onEditItem() {
+			router.push({ name: "item-edit", params: { id: String(itemId.value) } });
 		}
 
 		onMounted(loadAll);
@@ -277,7 +271,7 @@ const ItemDetail = {
 			eventMeta, formatDate, snackbar,
 			quickUsing, quickUse, onDeleteEvent,
 			eventModalOpen, adding, addableTypes, newEvent, submitEvent,
-			onDeleteItem,
+			onEditItem,
 		};
 	},
 };
