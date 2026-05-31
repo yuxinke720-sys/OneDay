@@ -1,14 +1,14 @@
 // Home.js —— 首页
-// 5 层：粉色 Header / 数据大盘 / 双层筛选(分类+状态) / 双列物品网格 / 排序弹窗
+// 差分滚动布局：固定渐变背景 + 吸顶 app bar + 自然滚动的大盘 + 吸顶筛选条 + 物品网格
 // 批量模式：顶部 toolbar 覆盖 + 卡片左上角选中圈 + 底部 3 个动作（分类 / 删除 / 状态）
 
 const Home = {
 	template: `
-		<div>
-			<!-- ============ 普通模式：粉色头部 + 大盘 + 筛选 ============ -->
+		<div class="home-page">
+			<!-- ============ 普通模式 ============ -->
 			<template v-if="!ui.batchMode">
-				<!-- 层 1：粉色渐变 Header -->
-				<div class="gradient-header pa-5 pb-16">
+				<!-- A 区：吸顶 app bar；滚下去切毛玻璃 -->
+				<div class="home-appbar" :class="{ 'home-appbar-floating': scrolled }">
 					<div class="d-flex align-center justify-space-between">
 						<h1 class="text-h4 font-weight-black">OneDay</h1>
 						<div>
@@ -21,7 +21,7 @@ const Home = {
 							</v-btn>
 						</div>
 					</div>
-					<div class="text-caption text-grey-darken-1" v-if="!searchVisible">记录每一件物品的真实使用成本</div>
+					<div class="text-caption text-grey-darken-1" v-if="!searchVisible && !scrolled">记录每一件物品的真实使用成本</div>
 					<v-text-field
 						v-if="searchVisible"
 						v-model="searchKeyword"
@@ -36,8 +36,8 @@ const Home = {
 					></v-text-field>
 				</div>
 
-				<!-- 层 2：数据大盘 -->
-				<v-card class="mx-4 mt-n12 pa-4 rounded-xl" elevation="3">
+				<!-- B 区：大盘卡，自然流；mt-n4 让卡片轻微叠到 app bar 下沿 -->
+				<v-card ref="dashRef" class="dashboard-card mx-4 pa-4 rounded-xl" elevation="3">
 					<div class="d-flex align-center">
 						<div class="flex-grow-1">
 							<div class="text-caption text-grey">总资产</div>
@@ -69,38 +69,45 @@ const Home = {
 					</v-row>
 				</v-card>
 
-				<!-- 层 3a：自定义分类（加粗加大）+ 排序 + 批量选择入口 -->
-				<div class="d-flex align-center px-4 mt-4">
-					<v-chip-group v-model="activeCategory" mandatory class="flex-grow-1" show-arrows>
-						<v-chip v-for="cat in categories" :key="cat" :value="cat" filter color="pink-lighten-2" variant="tonal" class="category-chip">{{ cat }}</v-chip>
-					</v-chip-group>
-					<v-btn
-						variant="outlined"
-						size="small"
-						rounded="pill"
-						class="ml-2"
-						@click="openSort"
-					>
-						<v-icon icon="mdi-sort" size="16" class="mr-1"></v-icon>
-						<span class="text-caption">{{ currentSortLabel }}</span>
-						<v-icon icon="mdi-chevron-down" size="14"></v-icon>
-					</v-btn>
-					<v-btn icon="mdi-checkbox-multiple-outline" variant="text" size="small" class="ml-1" @click="enterBatch"></v-btn>
-				</div>
-
-				<!-- 层 3b：状态筛选 -->
-				<div class="d-flex align-center px-4">
-					<v-chip-group v-model="activeStatus" mandatory class="flex-grow-1" show-arrows>
-						<v-chip
-							v-for="s in statusOptions"
-							:key="s.key"
-							:value="s.key"
-							filter
-							:color="s.color"
-							variant="tonal"
+				<!-- C 区：吸顶筛选条 -->
+				<div class="home-filters" :class="{ 'home-filters-sticky': scrolled }">
+					<!-- 分类 + 排序 + 批量入口 -->
+					<div class="d-flex align-center px-4 pt-2">
+						<div class="chip-fade-mask flex-grow-1" style="min-width: 0; overflow: hidden;">
+							<v-chip-group v-model="activeCategory" mandatory>
+								<v-chip v-for="cat in categories" :key="cat" :value="cat" variant="text" class="category-chip">{{ cat }}</v-chip>
+							</v-chip-group>
+						</div>
+						<v-btn
+							variant="outlined"
 							size="small"
-						>{{ s.label }}</v-chip>
-					</v-chip-group>
+							rounded="pill"
+							class="ml-2"
+							@click="openSort"
+						>
+							<v-icon icon="mdi-sort" size="16" class="mr-1"></v-icon>
+							<span class="text-caption">{{ currentSortLabel }}</span>
+							<v-icon icon="mdi-chevron-down" size="14"></v-icon>
+						</v-btn>
+						<v-btn icon="mdi-checkbox-multiple-outline" variant="text" size="small" class="ml-1" @click="enterBatch"></v-btn>
+					</div>
+
+					<!-- 状态筛选（右侧渐隐遮罩，提示横向有更多）-->
+					<div class="d-flex align-center px-4 pb-1">
+						<div class="chip-fade-mask flex-grow-1" style="min-width: 0; overflow: hidden;">
+							<v-chip-group v-model="activeStatus" mandatory>
+								<v-chip
+									v-for="s in statusOptions"
+									:key="s.key"
+									:value="s.key"
+									filter
+									:color="s.color"
+									variant="tonal"
+									size="small"
+								>{{ s.label }}</v-chip>
+							</v-chip-group>
+						</div>
+					</div>
 				</div>
 			</template>
 
@@ -275,6 +282,22 @@ const Home = {
 			(auth.user?.name || auth.user?.student_number || "?").trim().slice(0, 1).toUpperCase()
 		);
 		function goSettings() { router.push({ name: "settings" }); }
+
+		// 差分滚动：监听大盘卡是否完全滚出 app bar 下沿
+		// 触发后 app bar 切毛玻璃、筛选条吸顶
+		const dashRef  = ref(null);
+		const scrolled = ref(false);
+		let io = null;
+		onMounted(() => {
+			const el = dashRef.value?.$el || dashRef.value;
+			if (!el) return;
+			io = new IntersectionObserver(
+				([entry]) => { scrolled.value = !entry.isIntersecting; },
+				{ rootMargin: "-56px 0px 0px 0px", threshold: 0 },
+			);
+			io.observe(el);
+		});
+		onUnmounted(() => io?.disconnect());
 
 		const overview = ref({
 			total_assets: 0, daily_cost: 0, total_count: 0,
@@ -550,6 +573,7 @@ const Home = {
 
 		return {
 			ui, auth, avatarInitial, goSettings,
+			dashRef, scrolled,
 			overview, items, loading,
 			categories, activeCategory,
 			activeStatus, statusOptions,

@@ -57,10 +57,16 @@ const Settings = {
 				<v-list class="rounded-xl mb-4" lines="two">
 					<v-list-item
 						title="主题色"
-						subtitle="浅粉色"
+						:subtitle="currentThemeTitle"
 						prepend-icon="mdi-palette-outline"
 						append-icon="mdi-chevron-right"
-					></v-list-item>
+						@click="themeOpen = true"
+					>
+						<template v-slot:append>
+							<span class="theme-swatch-mini mr-2" :style="{ background: ui.accent }"></span>
+							<v-icon icon="mdi-chevron-right" size="18" color="grey"></v-icon>
+						</template>
+					</v-list-item>
 					<v-list-item
 						title="货币"
 						subtitle="CNY"
@@ -94,6 +100,51 @@ const Settings = {
 					退出登录
 				</v-btn>
 
+				<!-- 主题色画廊：每张电影海报 + 5 个色环 -->
+				<v-bottom-sheet v-model="themeOpen">
+					<v-card class="rounded-t-xl">
+						<div class="d-flex align-center justify-space-between px-4 py-3">
+							<v-btn icon="mdi-close" variant="text" size="small" @click="themeOpen = false"></v-btn>
+							<span class="text-subtitle-1 font-weight-bold">主题色画廊</span>
+							<div style="width: 40px;"></div>
+						</div>
+						<div class="theme-divider"></div>
+						<div class="theme-gallery-scroll">
+							<div v-for="t in themes" :key="t.id" class="theme-card">
+								<div class="theme-card-title">{{ t.title }}</div>
+								<v-img
+									v-if="t.image"
+									:src="t.image"
+									aspect-ratio="3/4"
+									cover
+									class="theme-card-img"
+								></v-img>
+								<div v-else class="theme-card-img theme-card-fallback d-flex align-center justify-center">
+									<v-icon icon="mdi-flower-outline" size="40" color="white"></v-icon>
+								</div>
+								<div class="theme-swatch-row">
+									<button
+										v-for="c in t.colors"
+										:key="c"
+										class="theme-swatch"
+										:class="{ 'theme-swatch-active': ui.accent.toLowerCase() === c.toLowerCase() }"
+										:style="{ background: c }"
+										:title="c"
+										@click="pickAccent(c)"
+									>
+										<v-icon
+											v-if="ui.accent.toLowerCase() === c.toLowerCase()"
+											icon="mdi-check"
+											size="16"
+											color="white"
+										></v-icon>
+									</button>
+								</div>
+							</div>
+						</div>
+					</v-card>
+				</v-bottom-sheet>
+
 				<v-dialog v-model="confirmLogout" max-width="320">
 					<v-card class="rounded-xl pa-4">
 						<div class="text-subtitle-1 font-weight-bold mb-2">确认退出登录？</div>
@@ -116,11 +167,25 @@ const Settings = {
 	setup() {
 		const router = VueRouter.useRouter();
 		const auth   = useAuthStore();
+		const ui     = useAppStore();
 
 		const avatarInput = ref(null);
 		const uploading   = ref(false);
 		const confirmLogout = ref(false);
 		const snack = reactive({ show: false, msg: "", color: "success" });
+
+		// 主题画廊
+		const themeOpen = ref(false);
+		const themes    = THEME_PRESETS; // 从 Auth.js 暴露的全局
+		const currentThemeTitle = computed(() => {
+			const t = themes.find(t => t.colors.map(c => c.toLowerCase()).includes(ui.accent.toLowerCase()));
+			return t ? `${t.title} · ${ui.accent}` : ui.accent;
+		});
+		function pickAccent(hex) {
+			ui.setAccent(hex);
+			tip("已切换主题色");
+			setTimeout(() => { themeOpen.value = false; }, 300);
+		}
 
 		const avatarInitial = computed(() =>
 			(auth.user?.name || auth.user?.student_number || "?").trim().slice(0, 1).toUpperCase()
@@ -176,9 +241,10 @@ const Settings = {
 		}
 
 		return {
-			auth, avatarInitial, avatarInput, uploading,
+			auth, ui, avatarInitial, avatarInput, uploading,
 			confirmLogout, snack,
 			triggerAvatarPick, onAvatarPick, handleLogout,
+			themeOpen, themes, currentThemeTitle, pickAccent,
 		};
 	},
 };

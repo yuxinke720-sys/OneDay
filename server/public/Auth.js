@@ -122,3 +122,40 @@ async function authFetchJSON(url, opts) {
 	const r = await authFetch(url, opts);
 	return await r.json();
 }
+
+// ===== 主题色（accent）=====
+// 9 部电影的色卡（草鱼设计志），每部 5 个颜色；外加一个 OneDay 原生粉
+const THEME_PRESETS = [
+	{ id: "oneday",      title: "OneDay 原色",  image: null,             colors: ["#ff7f9d","#ffb3c5","#ffe5ec","#ff5f87","#ff7f9d"] },
+	{ id: "pride",       title: "《傲慢与偏见》", image: "/public/themes/pride.jpg",       colors: ["#192426","#243C46","#5B7E8A","#929797","#BB9B90"] },
+	{ id: "tiger",       title: "《卧虎藏龙》",   image: "/public/themes/tiger.jpg",       colors: ["#082D0B","#01544B","#207030","#D3E0E1","#0B4724"] },
+	{ id: "fall",        title: "《坠入》",       image: "/public/themes/fall.jpg",        colors: ["#132C48","#587884","#264565","#9A9B99","#757358"] },
+	{ id: "oppenheimer", title: "《奥本海默》",   image: "/public/themes/oppenheimer.jpg", colors: ["#122019","#2B4828","#BAAA93","#7D8987","#342F26"] },
+	{ id: "joker",       title: "《小丑》",       image: "/public/themes/joker.jpg",       colors: ["#05201F","#63272F","#AC7414","#593E11","#044342"] },
+	{ id: "paddington",  title: "《帕丁顿熊》",   image: "/public/themes/paddington.jpg",  colors: ["#65553B","#B6AEA4","#790E25","#295257","#1F2926"] },
+	{ id: "truman",      title: "《楚门的世界》", image: "/public/themes/truman.jpg",      colors: ["#2E292F","#49546E","#7084B1","#D8DEFB","#4B5265"] },
+	{ id: "lalaland",    title: "《爱乐之城》",   image: "/public/themes/lalaland.jpg",    colors: ["#8B6377","#AB97AA","#CBBCB8","#68517B","#312D49"] },
+	{ id: "forrest",     title: "《阿甘正传》",   image: "/public/themes/forrest.jpg",     colors: ["#4F4B29","#222014","#BE927E","#E8D5C7","#303A49"] },
+];
+const ACCENT_STORAGE = "oneday_accent";
+const DEFAULT_ACCENT = "#ff7f9d";
+
+function hexToRgb(hex) {
+	const m = String(hex).trim().replace(/^#/, "");
+	const h = m.length === 3 ? m.split("").map(c => c + c).join("") : m;
+	const n = parseInt(h, 16);
+	return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+function applyAccent(hex) {
+	const safe = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : DEFAULT_ACCENT;
+	document.documentElement.style.setProperty("--accent", safe);
+	document.documentElement.style.setProperty("--accent-rgb", hexToRgb(safe));
+}
+// 启动时尽早恢复主题色，避免页面闪一下原色
+(() => {
+	try {
+		const saved = localStorage.getItem(ACCENT_STORAGE);
+		applyAccent(saved || DEFAULT_ACCENT);
+	} catch { applyAccent(DEFAULT_ACCENT); }
+})();
+

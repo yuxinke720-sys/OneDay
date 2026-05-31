@@ -10,11 +10,78 @@
 		<style>
 			html, body, #app { height: 100%; margin: 0; }
 			body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
-			/* 渐变背景层（首页氛围）*/
-			.gradient-header {
-				background: linear-gradient(160deg, #ffe5ec 0%, #fff0f5 60%, #fef6f9 100%);
+			/* 主题色变量：实际值由 Auth.js 的 applyAccent() 在 :root 上覆盖；此处仅作兜底 */
+			:root { --accent: #ff7f9d; --accent-rgb: 255, 127, 157; }
+			/* ===== 首页差分滚动布局 ===== */
+			/* 整页渐变背景：固定不滚（attachment:fixed），上浓下淡过渡到白 */
+			.home-page {
+				min-height: 100vh;
+				background: linear-gradient(160deg,
+					rgba(var(--accent-rgb), 0.45) 0%,
+					rgba(var(--accent-rgb), 0.18) 280px,
+					#fafafa 480px);
+				background: linear-gradient(160deg,
+					color-mix(in srgb, var(--accent) 55%, #fff) 0%,
+					color-mix(in srgb, var(--accent) 22%, #fff) 280px,
+					#fafafa 480px);
+				background-attachment: fixed;
 			}
-			.cost-accent { color: #ff7f9d; font-weight: 700; }
+			/* A 区：吸顶 app bar，初始透明、滚下去切毛玻璃 */
+			.home-appbar {
+				position: sticky; top: 0; z-index: 20;
+				padding: 12px 20px 6px;
+				transition: background .25s ease, backdrop-filter .25s ease, box-shadow .25s ease, padding .25s ease;
+			}
+			.home-appbar-floating {
+				/* 兜底：白色半透 */
+				background: rgba(255,255,255,0.78);
+				/* 现代浏览器：主题色淡淡叠白做毛玻璃 */
+				background: color-mix(in srgb, var(--accent) 18%, rgba(255,255,255,0.82));
+				backdrop-filter: saturate(180%) blur(20px);
+				-webkit-backdrop-filter: saturate(180%) blur(20px);
+				box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+				padding: 8px 20px;
+			}
+			/* B 区：大盘卡，自然滚动；顶距上方 app bar 一些呼吸 */
+			.dashboard-card {
+				margin-top: 16px;
+			}
+			/* C 区：筛选条；滚到 app bar 下沿后吸顶 */
+			.home-filters {
+				margin-top: 12px;
+				z-index: 10;
+				transition: background .25s ease, backdrop-filter .25s ease;
+			}
+			.home-filters-sticky {
+				position: sticky; top: 56px;
+				/* 兜底 */
+				background: rgba(255,255,255,0.92);
+				/* 主题色淡淡叠白，比 app bar 更淡一点（视觉层级：app bar 稍重，下方 filters 稍轻）*/
+				background: color-mix(in srgb, var(--accent) 12%, rgba(255,255,255,0.90));
+				backdrop-filter: saturate(180%) blur(16px);
+				-webkit-backdrop-filter: saturate(180%) blur(16px);
+				box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+			}
+			/* 横向 chip-group 右端渐隐：用主题色渐变叠在右边，融入背景 */
+			.chip-fade-mask {
+				position: relative;
+			}
+			.chip-fade-mask::after {
+				content: '';
+				position: absolute;
+				top: 0; right: 0; bottom: 0;
+				width: 48px;
+				pointer-events: none;             /* 不挡点击 */
+				background: linear-gradient(to right,
+					rgba(var(--accent-rgb), 0) 0%,
+					rgba(var(--accent-rgb), 0.22) 100%);
+				background: linear-gradient(to right,
+					rgba(255, 255, 255, 0) 0%,
+					color-mix(in srgb, var(--accent) 22%, #fff) 100%);
+			}
+			/* 兼容旧代码引用：批量模式下还在用 gradient-header；现在让它什么都不做 */
+			.gradient-header { background: transparent; }
+			.cost-accent { color: var(--accent); font-weight: 700; }
 			.status-dot {
 				display: inline-block;
 				width: 10px; height: 10px; border-radius: 50%;
@@ -107,11 +174,73 @@
 			/* 给所有页面底部留出 nav 高度的空间 */
 			.v-main { padding-bottom: 92px !important; }
 
+			/* ===== 主题色画廊 ===== */
+			.theme-swatch-mini {
+				display: inline-block;
+				width: 18px; height: 18px;
+				border-radius: 50%;
+				border: 2px solid #fff;
+				box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+				vertical-align: middle;
+			}
+			.theme-divider { height: 1px; background-color: rgba(0,0,0,0.06); }
+			.theme-gallery-scroll {
+				max-height: 70vh;
+				overflow-y: auto;
+				padding: 12px 16px 24px;
+			}
+			.theme-card {
+				margin-bottom: 18px;
+				padding-bottom: 14px;
+				border-bottom: 1px solid rgba(0,0,0,0.05);
+			}
+			.theme-card:last-child { border-bottom: none; }
+			.theme-card-title {
+				font-size: 1rem;
+				font-weight: 700;
+				letter-spacing: 1px;
+				text-align: center;
+				margin-bottom: 10px;
+				color: #222;
+			}
+			.theme-card-img {
+				border-radius: 12px;
+				overflow: hidden;
+				box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+			}
+			.theme-card-fallback {
+				aspect-ratio: 3/4;
+				background: linear-gradient(135deg, #ffe5ec, #ffb3c5);
+			}
+			.theme-swatch-row {
+				display: flex;
+				justify-content: space-between;
+				margin-top: 12px;
+				padding: 0 4px;
+			}
+			.theme-swatch {
+				flex: 1;
+				aspect-ratio: 1;
+				max-width: 48px;
+				margin: 0 4px;
+				border-radius: 50%;
+				border: 2px solid #fff;
+				box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+				cursor: pointer;
+				display: flex; align-items: center; justify-content: center;
+				transition: transform .15s ease, box-shadow .15s ease;
+			}
+			.theme-swatch:hover { transform: scale(1.08); }
+			.theme-swatch-active {
+				box-shadow: 0 0 0 3px var(--accent);
+				transform: scale(1.1);
+			}
+
 			/* ===== ItemAdd 表单页（图5 风格）===== */
 			.iadd-page { padding-bottom: 120px; min-height: 100vh; background: #f5f5f7; }
 			.iadd-kind-toggle .v-btn { letter-spacing: 4px; font-size: 1rem; }
 			.iadd-kind-btn { min-width: 56px !important; }
-			.iadd-kind-btn.v-btn--active { font-weight: 800; border-bottom: 3px solid #ff7f9d; border-radius: 0 !important; }
+			.iadd-kind-btn.v-btn--active { font-weight: 800; border-bottom: 3px solid var(--accent); border-radius: 0 !important; }
 
 			.iadd-icon-wrap {
 				position: relative;
@@ -253,13 +382,32 @@
 			.status-action-row:last-child { border-bottom: none; }
 			.status-action-row:active { background-color: rgba(0,0,0,0.04); }
 
-			/* 首页分类筛选条：加粗 + 加大一号（与下方状态条形成层级对比）*/
+			/* 首页分类筛选条：纯文字风格（无气泡、无箭头切换器），选中加重+底部强调线 */
 			.category-chip {
 				font-size: 0.95rem !important;
-				font-weight: 600 !important;
+				font-weight: 500 !important;
 				height: 36px !important;
-				padding: 0 14px !important;
+				padding: 0 10px !important;
 				letter-spacing: 0.5px;
+				color: #999 !important;
+				background: transparent !important;
+				border-radius: 0 !important;
+				transition: color .15s ease;
+			}
+			.category-chip:hover { color: #333 !important; }
+			.category-chip.v-chip--selected {
+				color: #000 !important;
+				font-weight: 700 !important;
+				position: relative;
+			}
+			.category-chip.v-chip--selected::after {
+				content: '';
+				position: absolute;
+				left: 10px; right: 10px;
+				bottom: 6px;
+				height: 3px;
+				background: var(--accent);
+				border-radius: 2px;
 			}
 
 			/* Settings 头像：右下角小相机叠加 */
@@ -273,7 +421,7 @@
 				position: absolute;
 				right: 0; bottom: 0;
 				width: 24px; height: 24px;
-				background: #ff7f9d;
+				background: var(--accent);
 				border-radius: 50%;
 				border: 2px solid #fff;
 				display: flex; align-items: center; justify-content: center;
@@ -286,7 +434,16 @@
 			/* 登录/注册页 */
 			.auth-bg {
 				min-height: 100vh;
-				background: linear-gradient(160deg, #ffe5ec 0%, #fff0f5 55%, #ffffff 100%);
+				/* 兜底 */
+				background: linear-gradient(160deg,
+					rgba(var(--accent-rgb), 0.35) 0%,
+					rgba(var(--accent-rgb), 0.12) 55%,
+					#ffffff 100%);
+				/* 现代浏览器：与白色混色，弱主题色也能看见层次 */
+				background: linear-gradient(160deg,
+					color-mix(in srgb, var(--accent) 40%, #fff) 0%,
+					color-mix(in srgb, var(--accent) 15%, #fff) 55%,
+					#ffffff 100%);
 			}
 			.auth-card {
 				width: 100%;
@@ -295,13 +452,15 @@
 			}
 			.auth-logo {
 				width: 64px; height: 64px; border-radius: 18px;
-				background: linear-gradient(135deg, #ff7f9d, #ff5f87);
+				background: linear-gradient(135deg,
+					var(--accent),
+					color-mix(in srgb, var(--accent) 70%, #000));
 				display: flex; align-items: center; justify-content: center;
-				box-shadow: 0 6px 20px rgba(255, 95, 135, 0.35);
+				box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.35);
 			}
 			.auth-cta {
 				letter-spacing: 4px;
-				box-shadow: 0 4px 14px rgba(236, 64, 122, 0.35) !important;
+				box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.35) !important;
 			}
 			/* 排序弹窗：顶部操作栏（取消 / 标题 / 确定）*/
 			.sort-header {
@@ -324,10 +483,10 @@
 				font-weight: 600 !important;
 				padding-left: 18px !important;
 				padding-right: 18px !important;
-				box-shadow: 0 4px 14px rgba(236, 64, 122, 0.35) !important;
+				box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.35) !important;
 			}
 			.sort-confirm-btn:active {
-				box-shadow: 0 2px 6px rgba(236, 64, 122, 0.4) !important;
+				box-shadow: 0 2px 6px rgba(var(--accent-rgb), 0.4) !important;
 				transform: translateY(1px);
 			}
 			/* 排序弹窗：极简两端对齐行 */
@@ -351,12 +510,18 @@
 			const { createVuetify } = Vuetify;
 			const { defineStore, createPinia } = Pinia;
 
-			// ===== 全局 store：UI 状态（批量选择模式等）=====
+			// ===== 全局 store：UI 状态 + 主题色 =====
 			const useAppStore = defineStore("app", () => {
 				const drawer = ref(false);
-				const accent = ref("#ff7f9d");
 				const batchMode = ref(false);     // 批量选择模式（开启时隐藏底部胶囊导航）
-				return { drawer, accent, batchMode };
+				// 主题色：从 localStorage 恢复（Auth.js 启动时已经 applyAccent 过一次了）
+				const accent = ref(localStorage.getItem("oneday_accent") || "#ff7f9d");
+				function setAccent(hex) {
+					accent.value = hex;
+					localStorage.setItem("oneday_accent", hex);
+					applyAccent(hex); // 把 CSS 变量也同步
+				}
+				return { drawer, batchMode, accent, setAccent };
 			});
 
 			// ===== 路由 =====
