@@ -7,11 +7,9 @@ import cors from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
 import { config } from 'dotenv';
 import { sql } from './db';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHmac } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join, extname } from 'node:path';
-// @ts-ignore — crypto-js 无 .d.ts；按 JS 运行即可
-import CryptoJS from 'crypto-js';
 
 config();
 
@@ -26,23 +24,27 @@ const KEY = process.env.CRYPTO_KEY || '1234567890123456';
 const JWT_SECRET = process.env.JWT_SECRET || KEY;
 const JWT_EXPIRES_MS = 24 * 60 * 60 * 1000; // 24h
 
-function base64UrlEncode(wa: any): string {
-  return CryptoJS.enc.Base64.stringify(wa)
+// base64url：用 Node 的 Buffer 做编/解码 + URL-safe 字符替换
+function b64uFromBuffer(buf: Buffer): string {
+  return buf.toString('base64')
     .replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
-function base64UrlDecodeToUtf8(s: string): string {
+function b64uToUtf8(s: string): string {
   let str = s.replace(/-/g, '+').replace(/_/g, '/');
   while (str.length % 4) str += '=';
-  return CryptoJS.enc.Base64.parse(str).toString(CryptoJS.enc.Utf8);
+  return Buffer.from(str, 'base64').toString('utf8');
+}
+function hmacSha256(key: string, msg: string): Buffer {
+  return createHmac('sha256', key).update(msg).digest();
 }
 
 function generateJWT(payload: Record<string, unknown>): string {
   const now = Date.now();
   const jwtPayload = { ...payload, iat: now, exp: now + JWT_EXPIRES_MS };
   const header = JSON.stringify({ alg: 'HS256', typ: 'JWT' });
-  const encH = base64UrlEncode(CryptoJS.enc.Utf8.parse(header));
-  const encP = base64UrlEncode(CryptoJS.enc.Utf8.parse(JSON.stringify(jwtPayload)));
-  const sig  = base64UrlEncode(CryptoJS.HmacSHA256(`${encH}.${encP}`, CryptoJS.enc.Utf8.parse(JWT_SECRET)));
+  const encH = b64uFromBuffer(Buffer.from(header, 'utf8'));
+  const encP = b64uFromBuffer(Buffer.from(JSON.stringify(jwtPayload), 'utf8'));
+  const sig  = b64uFromBuffer(hmacSha256(JWT_SECRET, `${encH}.${encP}`));
   return `${encH}.${encP}.${sig}`;
 }
 
@@ -50,11 +52,9 @@ function verifyJWT(token: string): Record<string, any> | null {
   try {
     const [encH, encP, sig] = token.split('.');
     if (!encH || !encP || !sig) return null;
-    const expected = base64UrlEncode(
-      CryptoJS.HmacSHA256(`${encH}.${encP}`, CryptoJS.enc.Utf8.parse(JWT_SECRET))
-    );
+    const expected = b64uFromBuffer(hmacSha256(JWT_SECRET, `${encH}.${encP}`));
     if (expected !== sig) return null;
-    const payload = JSON.parse(base64UrlDecodeToUtf8(encP));
+    const payload = JSON.parse(b64uToUtf8(encP));
     if (payload.exp && payload.exp < Date.now()) return null;
     return payload;
   } catch {
