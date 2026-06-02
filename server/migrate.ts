@@ -1,23 +1,106 @@
-// migrate.ts —— 增量迁移（幂等，不动已有数据）
+// migrate.ts —— 幂等迁移（既能从零建库 + 又能在老库上加新列）
 //   bun run migrate
 //
-// 用于把"上个 git 版本"的 OneDay DB 升级到当前版本：
-//   - students 加 avatar / password / isadmin 列（若已存在则跳过）
-//   - items    加 user_id + 7 个新字段
-//   - 建 sub_items 表
-//   - 建/更新 admin 账号（学号 S20260530 / 密码 123456）
-//   - 把没归属用户的 items 全部挂到 admin
+// 适用两种场景：
+//   1) 全新 Win 机器（只有 student-servertest-main 留下的 students 表）：
+//      → 自动建 items / events / images / tags / item_tags / sub_items 表
+//      → 加 OneDay 自己需要的所有新字段
+//      → 建 admin 账号
+//   2) 老 OneDay 机器：
+//      → CREATE TABLE IF NOT EXISTS 跳过已存在的表
+//      → ALTER TABLE ... IF NOT EXISTS 加新列
+//      → 已有数据完全保留
 //
-// 任何已存在的列 / 表 / 数据都不会被覆盖。多次运行结果相同。
+// 任何已存在的表 / 列 / 数据都不会被覆盖。多次运行结果相同。
 
 import { sql } from './db';
 
 async function main() {
   console.log('═══════════════════════════════════════');
-  console.log('  OneDay DB 增量迁移');
+  console.log('  OneDay DB 迁移（建库 + 升级二合一）');
   console.log('═══════════════════════════════════════\n');
 
   try {
+    // ============================================================
+    // 0. 基础表 bootstrap（全新机器需要；老机器自动跳过）
+    //    内容等价于 init-db.ts 的 CREATE 部分，但全部带 IF NOT EXISTS
+    // ============================================================
+    console.log('▸ 基础表 bootstrap');
+
+    // event_type ENUM —— PG 没有 CREATE TYPE IF NOT EXISTS，用 EXCEPTION 兜底
+    await sql`
+      DO $$ BEGIN
+        CREATE TYPE event_type AS ENUM (
+          'purchase', 'usage', 'maintenance', 'repair', 'consumable', 'sell'
+        );
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS items (
+        id                BIGSERIAL    PRIMARY KEY,
+        name              VARCHAR(100) NOT NULL,
+        category          VARCHAR(50),
+        acquisition_date  DATE         NOT NULL DEFAULT CURRENT_DATE,
+        purchase_price    NUMERIC(10,2) NOT NULL DEFAULT 0,
+        currency          VARCHAR(3)   NOT NULL DEFAULT 'CNY',
+        status            VARCHAR(20)  NOT NULL DEFAULT 'using',
+        cover_image_id    BIGINT,
+        notes             TEXT,
+        created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+        updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_items_category ON items(category)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_items_status   ON items(status)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS events (
+        id           BIGSERIAL    PRIMARY KEY,
+        item_id      BIGINT       NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        type         event_type   NOT NULL,
+        occurred_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+        amount       NUMERIC(10,2) NOT NULL DEFAULT 0,
+        quantity     INT          NOT NULL DEFAULT 1,
+        description  TEXT,
+        metadata     JSONB        NOT NULL DEFAULT '{}'::jsonb,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_events_item_time ON events(item_id, occurred_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_events_type      ON events(type)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS images (
+        id          BIGSERIAL    PRIMARY KEY,
+        item_id     BIGINT       NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        event_id    BIGINT                REFERENCES events(id) ON DELETE SET NULL,
+        url         VARCHAR(500) NOT NULL,
+        width       INT,
+        height      INT,
+        sort_order  INT          NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_images_item  ON images(item_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_images_event ON images(event_id)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS tags (
+        id    BIGSERIAL    PRIMARY KEY,
+        name  VARCHAR(30)  UNIQUE NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS item_tags (
+        item_id  BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        tag_id   BIGINT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
+        PRIMARY KEY (item_id, tag_id)
+      )
+    `;
+    console.log('  ✓ event_type / items / events / images / tags / item_tags\n');
+
     // ============================================================
     // 1. students 表补列（共用 student_db；password/isadmin 可能由
     //    student-servertest-main 已经建过，加 IF NOT EXISTS 安全）
@@ -93,9 +176,9 @@ async function main() {
     const [cnt]  = await sql`SELECT COUNT(*)::int AS n FROM items WHERE user_id IS NULL`;
     const [my]   = await sql`SELECT COUNT(*)::int AS n FROM items WHERE user_id = ${adminId}`;
     const [tot]  = await sql`SELECT COUNT(*)::int AS n FROM items`;
-    console.log(`  - admin 名下物品：${my.n}`);
-    console.log(`  - 总物品：${tot.n}`);
-    console.log(`  - 仍无归属：${cnt.n} ${cnt.n === 0 ? '✓' : '(异常)'}\n`);
+    console.log(`  - admin 名下物品：${my!.n}`);
+    console.log(`  - 总物品：${tot!.n}`);
+    console.log(`  - 仍无归属：${cnt!.n} ${cnt!.n === 0 ? '✓' : '(异常)'}\n`);
 
     console.log('═══════════════════════════════════════');
     console.log('  ✅ 迁移完成，可以启动了：bun run dev');
