@@ -8,7 +8,7 @@ import { staticPlugin } from '@elysiajs/static';
 import { config } from 'dotenv';
 import { sql } from './db';
 import { randomUUID, createHmac } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 
 config();
@@ -269,7 +269,8 @@ const app = new Elysia()
       INSERT INTO items (
         name, category, acquisition_date, purchase_price, currency, status, notes, user_id,
         target_cost_type, target_cost_value, exclude_from_assets, exclude_from_daily,
-        expire_date, expire_reminder, is_wish
+        expire_date, expire_reminder, is_wish,
+        icon_kind, icon_value
       )
       VALUES (
         ${b.name},
@@ -286,7 +287,9 @@ const app = new Elysia()
         ${b.exclude_from_daily ?? false},
         ${b.expire_date ?? null},
         ${b.expire_reminder ?? false},
-        ${b.is_wish ?? false}
+        ${b.is_wish ?? false},
+        ${b.icon_kind ?? null},
+        ${b.icon_value ?? null}
       )
       RETURNING *
     `;
@@ -311,6 +314,7 @@ const app = new Elysia()
       'name','category','acquisition_date','purchase_price','currency','status',
       'cover_image_id','notes','target_cost_type','target_cost_value',
       'exclude_from_assets','exclude_from_daily','expire_date','expire_reminder','is_wish',
+      'icon_kind','icon_value',
     ];
     const sets: any[] = [];
     for (const k of PATCHABLE) {
@@ -576,6 +580,39 @@ const app = new Elysia()
   .get('/api/tags', async () => {
     const rows = await sql`SELECT * FROM tags ORDER BY name`;
     return { code: 200, data: rows };
+  })
+
+  // ========== 3D 图标列表（扫 public/icons/3d/ 目录 + 合并 names.json）==========
+  .get('/api/icons/3d', async () => {
+    const dir = join(PUBLIC_DIR, 'icons', '3d');
+    try {
+      // 读取中文名映射；缺失则全部回退到文件名
+      let nameMap: Record<string, string> = {};
+      try {
+        const raw = await readFile(join(dir, 'names.json'), 'utf-8');
+        const obj = JSON.parse(raw) as Record<string, string>;
+        // 忽略以下划线开头的 key（比如 _comment）
+        for (const k in obj) {
+          if (!k.startsWith('_')) nameMap[k] = obj[k]!;
+        }
+      } catch { /* names.json 不存在或解析失败，用空映射 */ }
+
+      const files = await readdir(dir);
+      const items = files
+        .filter(f => /\.(png|svg|webp|jpg|jpeg)$/i.test(f))
+        .sort()
+        .map(f => {
+          const base = f.replace(/\.\w+$/, '');
+          return {
+            file: f,
+            url:  `/public/icons/3d/${f}`,
+            name: nameMap[base] || base,    // 找不到映射 → 用文件名
+          };
+        });
+      return { code: 200, data: items };
+    } catch (e: any) {
+      return { code: 500, message: `读取 icons/3d 失败: ${e.message}` };
+    }
   })
 
   // ========== 批量操作（首页批量选择模式）==========

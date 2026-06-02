@@ -3,10 +3,13 @@
 const ItemDetail = {
 	template: `
 		<div v-if="item">
-			<!-- Hero 大图 -->
+			<!-- Hero 大图：emoji / 图片 / 占位 三选一 -->
 			<div style="position: relative; aspect-ratio: 4 / 3; background: #ececf0;">
+				<div v-if="item.icon_kind === 'emoji'" class="d-flex align-center justify-center" style="height: 100%; font-size: 8rem; line-height: 1;">
+					{{ item.icon_value }}
+				</div>
 				<v-img
-					v-if="cover"
+					v-else-if="cover"
 					:src="cover"
 					aspect-ratio="4/3"
 					cover
@@ -157,6 +160,8 @@ const ItemDetail = {
 
 		const cover = computed(() => {
 			if (!item.value) return "";
+			// 优先新模型 (icon_kind=3d/image)，再回退到老 cover_url
+			if (item.value.icon_kind === "3d" || item.value.icon_kind === "image") return item.value.icon_value;
 			return item.value.cover_url || item.value.images?.[0]?.url || "";
 		});
 

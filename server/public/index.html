@@ -236,6 +236,64 @@
 				transform: scale(1.1);
 			}
 
+			/* 首页物品卡片的 emoji 渲染 */
+			.item-card-emoji {
+				display: flex; align-items: center; justify-content: center;
+				background: #f6f6f9;
+				font-size: 3.5rem;
+				line-height: 1;
+			}
+			/* ===== 图标选择器（IconPicker）===== */
+			.iadd-icon-emoji {
+				width: 100%;
+				aspect-ratio: 1;
+				background: #f6f6f9;
+				border-radius: 16px;
+				display: flex; align-items: center; justify-content: center;
+				font-size: 2.4rem;
+				line-height: 1;
+			}
+			.icon-grid {
+				display: grid;
+				grid-template-columns: repeat(5, 1fr);
+				gap: 8px;
+				max-height: 60vh;
+				overflow-y: auto;
+			}
+			.icon-tile-emoji, .icon-tile-img {
+				background: #f6f6f9;
+				border: 2px solid transparent;
+				border-radius: 12px;
+				padding: 8px 4px;
+				cursor: pointer;
+				display: flex; flex-direction: column; align-items: center; justify-content: center;
+				transition: transform .12s ease, border-color .12s ease, background .12s ease;
+			}
+			.icon-tile-emoji { font-size: 1.8rem; line-height: 1.2; aspect-ratio: 1; }
+			.icon-tile-img img {
+				width: 100%; aspect-ratio: 1; object-fit: contain;
+				pointer-events: none;
+			}
+			.icon-tile-label {
+				font-size: 0.7rem;
+				color: #666;
+				margin-top: 4px;
+				text-align: center;
+				width: 100%;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				line-height: 1.2;
+			}
+			.icon-tile-emoji:hover, .icon-tile-img:hover {
+				transform: scale(1.05);
+				background: #fff;
+			}
+			.icon-tile-active {
+				border-color: var(--accent) !important;
+				background: rgba(var(--accent-rgb), 0.08) !important;
+			}
+
 			/* ===== ItemAdd 表单页（图5 风格）===== */
 			.iadd-page { padding-bottom: 120px; min-height: 100vh; background: #f5f5f7; }
 			.iadd-kind-toggle .v-btn { letter-spacing: 4px; font-size: 1rem; }

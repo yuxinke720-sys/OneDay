@@ -27,14 +27,12 @@ const ItemAdd = {
 			<v-container class="pb-32">
 				<!-- 物品图标 + 名称 -->
 				<div class="text-center mb-4">
-					<div class="iadd-icon-wrap mx-auto" @click="pickCover">
-						<v-img
-							v-if="coverPreview"
-							:src="coverPreview"
-							class="rounded-xl"
-							aspect-ratio="1"
-							cover
-						></v-img>
+					<div class="iadd-icon-wrap mx-auto" @click="openIconPicker">
+						<!-- emoji: 大字符直接渲染 -->
+						<div v-if="form.icon_kind === 'emoji'" class="iadd-icon-emoji">{{ form.icon_value }}</div>
+						<!-- 3d / image: 图片 -->
+						<v-img v-else-if="iconPreview" :src="iconPreview" class="rounded-xl" aspect-ratio="1" cover></v-img>
+						<!-- 默认占位 -->
 						<div v-else class="d-flex align-center justify-center" style="aspect-ratio: 1; background: #f6f6f9; border-radius: 16px;">
 							<v-icon icon="mdi-package-variant" size="42" color="brown-lighten-2"></v-icon>
 						</div>
@@ -42,7 +40,7 @@ const ItemAdd = {
 							<v-icon icon="mdi-pencil" size="13" color="white"></v-icon>
 						</div>
 					</div>
-					<input ref="coverInput" type="file" accept="image/*" style="display:none" @change="onCoverPick" />
+					<input ref="coverInput" type="file" accept="image/*" style="display:none" @change="onAlbumPick" />
 
 					<input
 						v-model="form.name"
@@ -240,6 +238,69 @@ const ItemAdd = {
 				></v-date-picker>
 			</v-dialog>
 
+			<!-- ===== 图标选择器（三 tab）===== -->
+			<v-dialog v-model="iconPickerOpen" max-width="520">
+				<v-card class="rounded-xl">
+					<v-tabs v-model="iconTab" color="pink-lighten-1" align-tabs="center" density="comfortable">
+						<v-tab value="album">相册</v-tab>
+						<v-tab value="emoji">Emoji</v-tab>
+						<v-tab value="3d">3D 图标</v-tab>
+					</v-tabs>
+					<v-divider></v-divider>
+					<v-window v-model="iconTab">
+						<!-- 相册：复用上传 -->
+						<v-window-item value="album">
+							<div class="pa-6 text-center">
+								<v-btn size="large" color="black" rounded="pill" @click="triggerAlbum">
+									<v-icon icon="mdi-image-plus" class="mr-2"></v-icon>
+									从相册选择图片
+								</v-btn>
+								<div class="text-caption text-grey mt-4">上传后图片会作为物品图标，自动剪裁为方形</div>
+								<v-img
+									v-if="form.icon_kind === 'image' && iconPreview"
+									:src="iconPreview"
+									class="rounded-xl mt-4 mx-auto"
+									max-width="160"
+									aspect-ratio="1"
+									cover
+								></v-img>
+							</div>
+						</v-window-item>
+						<!-- Emoji：80 个物品 emoji 网格 -->
+						<v-window-item value="emoji">
+							<div class="icon-grid pa-3">
+								<button
+									v-for="e in EMOJI_SET"
+									:key="e"
+									class="icon-tile-emoji"
+									:class="{ 'icon-tile-active': form.icon_kind === 'emoji' && form.icon_value === e }"
+									@click="pickEmoji(e)"
+								>{{ e }}</button>
+							</div>
+						</v-window-item>
+						<!-- 3D 图标：扫 server/public/icons/3d/ -->
+						<v-window-item value="3d">
+							<div v-if="loading3d" class="pa-6 text-center text-grey">加载中…</div>
+							<div v-else-if="!icons3d.length" class="pa-6 text-center text-grey text-caption">
+								server/public/icons/3d/ 还没有图标
+							</div>
+							<div v-else class="icon-grid pa-3">
+								<button
+									v-for="i in icons3d"
+									:key="i.url"
+									class="icon-tile-img"
+									:class="{ 'icon-tile-active': form.icon_kind === '3d' && form.icon_value === i.url }"
+									@click="pick3d(i)"
+								>
+									<img :src="i.url" :alt="i.name" />
+									<div class="icon-tile-label">{{ i.name }}</div>
+								</button>
+							</div>
+						</v-window-item>
+					</v-window>
+				</v-card>
+			</v-dialog>
+
 			<v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="2000">
 				{{ snackbar.msg }}
 			</v-snackbar>
@@ -270,6 +331,8 @@ const ItemAdd = {
 			expire_date:     null,
 			expire_reminder: false,
 			sub_items: [],
+			icon_kind:  null,   // 'emoji' | '3d' | 'image' | null
+			icon_value: null,   // emoji 字符 / 图标 URL / 上传后填充
 		});
 
 		// 退役/卖出 开关 ↔ status 的双向映射（互斥：开了退役自动关卖出，反之亦然）
@@ -294,18 +357,75 @@ const ItemAdd = {
 			       form.target_cost_type === "custom" ? "目标值" : "";
 		});
 
-		// 封面图（前端展示用）
-		const coverInput   = ref(null);
-		const coverFile    = ref(null);
-		const coverPreview = ref("");
-		function pickCover() { coverInput.value?.click(); }
-		function onCoverPick(e) {
+		// ===== 图标选择器 =====
+		const coverInput     = ref(null);
+		const coverFile      = ref(null);     // album tab 选的本地文件（待 submit 时上传）
+		const iconPickerOpen = ref(false);
+		const iconTab        = ref("3d");     // 默认打开 3D 那 tab
+		const icons3d        = ref([]);
+		const loading3d      = ref(false);
+
+		// 80 个物品类 emoji
+		const EMOJI_SET = [
+			"📦","🎒","👜","👝","🛍",
+			"📱","💻","⌨️","🖱","🖥","📺","🎮","🕹","🔋","🔌",
+			"🎧","🎤","🔊","📻","📷","📹","📼",
+			"⌚","🕰","💎","💍","👑","🎀","🕶","👓",
+			"👕","👔","👖","👗","🧥","🧣","🧤","🧦","👟","👞","👠","🧢","🎩",
+			"🛋","🛏","🪑","🚪","🪟","🛁","🚿","🪞","💡","🕯",
+			"💄","💅","🧴","🪒","🧼","🪥",
+			"🍎","🍞","🍔","🍕","🍰","☕","🍷","🍺","🥤","🍼",
+			"📚","📓","✏️","🖊","🔧","🔨","🪛","🪚","🧰",
+			"⚽","🏀","🎾","🏓","🚴","🏋️","🎯",
+		];
+
+		// 显示用：把 form.icon_kind/value + 本地新选的文件 + 编辑模式原 cover_url 三合一
+		const iconPreview = computed(() => {
+			if (form.icon_kind === "image") {
+				// 新选的本地文件，用 blob URL 预览；老物品 (无 coverFile) 用 icon_value 里的 URL
+				if (coverFile.value) return URL.createObjectURL(coverFile.value);
+				return form.icon_value || "";
+			}
+			if (form.icon_kind === "3d") return form.icon_value || "";
+			// emoji 不走这里（模板里有专门的 <div>）；null 也走兜底
+			return "";
+		});
+
+		async function openIconPicker() {
+			iconPickerOpen.value = true;
+			if (!icons3d.value.length && !loading3d.value) {
+				loading3d.value = true;
+				try {
+					const r = await authFetch("/api/icons/3d");
+					const j = await r.json();
+					if (j.code === 200) icons3d.value = j.data;
+				} catch { /* ignore */ }
+				finally { loading3d.value = false; }
+			}
+		}
+		function triggerAlbum() { coverInput.value?.click(); }
+		function onAlbumPick(e) {
 			const f = e.target.files?.[0];
 			e.target.value = "";
 			if (!f) return;
-			if (!f.type.startsWith("image/")) return;
-			coverFile.value = f;
-			coverPreview.value = URL.createObjectURL(f);
+			if (!f.type.startsWith("image/")) { tip("请选择图片", "error"); return; }
+			coverFile.value     = f;
+			form.icon_kind      = "image";
+			form.icon_value     = null;  // 真正的 URL 等上传完才有
+			// 选完立即关闭弹窗，让用户看到大图预览
+			iconPickerOpen.value = false;
+		}
+		function pickEmoji(e) {
+			form.icon_kind  = "emoji";
+			form.icon_value = e;
+			coverFile.value = null;
+			iconPickerOpen.value = false;
+		}
+		function pick3d(icon) {
+			form.icon_kind  = "3d";
+			form.icon_value = icon.url;
+			coverFile.value = null;
+			iconPickerOpen.value = false;
 		}
 
 		// 日期
@@ -412,8 +532,14 @@ const ItemAdd = {
 			form.sub_items       = (it.sub_items || []).map(s => ({ id: s.id, name: s.name, price: Number(s.price) }));
 			if (form.acquisition_date) dateValue.value = new Date(form.acquisition_date);
 			if (form.expire_date)      expireDateValue.value = new Date(form.expire_date);
-			// 已有封面：拿到 url 做预览
-			if (it.cover_url || it.images?.[0]?.url) coverPreview.value = it.cover_url || it.images[0].url;
+			// 图标预填：优先用 icon_kind/value（新模型），否则回退到 cover_url（老模型）
+			if (it.icon_kind && it.icon_value) {
+				form.icon_kind  = it.icon_kind;
+				form.icon_value = it.icon_value;
+			} else if (it.cover_url || it.images?.[0]?.url) {
+				form.icon_kind  = "image";
+				form.icon_value = it.cover_url || it.images[0].url;
+			}
 		}
 
 		function handleCancel() {
@@ -442,6 +568,9 @@ const ItemAdd = {
 					exclude_from_daily:  form.exclude_from_daily,
 					expire_date:     form.expire_date,
 					expire_reminder: !!form.expire_date && form.expire_reminder,
+					// 图标：emoji / 3d 类型直接进 payload；image 类型在下面上传完才有 url
+					icon_kind:  (form.icon_kind === "image" && coverFile.value) ? null : form.icon_kind,
+					icon_value: (form.icon_kind === "image" && coverFile.value) ? null : form.icon_value,
 				};
 
 				let itemId;
@@ -457,13 +586,17 @@ const ItemAdd = {
 					itemId = j.data.id;
 				}
 
-				// 封面：只在新选了图时上传
+				// album tab 新选的图：先上传，再 PATCH icon_kind=image + icon_value=img.url
 				if (coverFile.value) {
 					const img = await uploadCover(coverFile.value, itemId);
 					if (img) {
 						await authFetch("/api/items/" + itemId, {
 							method: "PATCH",
-							json: { cover_image_id: img.id },
+							json: {
+								cover_image_id: img.id,        // 老字段保留兼容
+								icon_kind:  "image",
+								icon_value: img.url,
+							},
 						});
 					}
 				}
@@ -488,7 +621,9 @@ const ItemAdd = {
 			isEdit, submitting, form,
 			retiredSwitch, soldSwitch,
 			targetCostLabel, canSave,
-			coverInput, coverPreview, pickCover, onCoverPick,
+			coverInput, iconPreview,
+			iconPickerOpen, iconTab, EMOJI_SET, icons3d, loading3d,
+			openIconPicker, triggerAlbum, onAlbumPick, pickEmoji, pick3d,
 			dateOpen, dateValue, onDateConfirm,
 			expireDateOpen, expireDateValue, onExpireDateConfirm,
 			addSubItem, removeSubItem,

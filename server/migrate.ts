@@ -123,8 +123,12 @@ async function main() {
     await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS expire_date         DATE`;
     await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS expire_reminder     BOOLEAN NOT NULL DEFAULT false`;
     await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS is_wish             BOOLEAN NOT NULL DEFAULT false`;
+    // 图标选择器：icon_kind ∈ 'emoji' | '3d' | 'image' | NULL（NULL = 用旧的 cover_image_id）
+    //          icon_value = emoji 字符 / '/public/icons/3d/xxx.png' / '/uploads/xxx.png'
+    await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS icon_kind  VARCHAR(10)`;
+    await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS icon_value TEXT`;
     await sql`CREATE INDEX IF NOT EXISTS idx_items_user_id ON items(user_id)`;
-    console.log('  ✓ items.user_id + 7 个新字段 + 索引\n');
+    console.log('  ✓ items.user_id + 7 个新字段 + icon_kind/icon_value + 索引\n');
 
     // ============================================================
     // 3. sub_items 表（附加物品）

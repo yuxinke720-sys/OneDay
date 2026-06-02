@@ -132,7 +132,11 @@ const Home = {
 						@click="onCardClick(item)"
 					>
 						<div style="position: relative;">
-							<v-img v-if="item.cover_url" :src="item.cover_url" aspect-ratio="1" cover></v-img>
+							<!-- emoji: 大字符 -->
+							<div v-if="item.icon_kind === 'emoji'" class="item-card-emoji" style="aspect-ratio: 1;">{{ item.icon_value }}</div>
+							<!-- 3d / image: 图片 -->
+							<v-img v-else-if="itemIconUrl(item)" :src="itemIconUrl(item)" aspect-ratio="1" cover></v-img>
+							<!-- 默认占位 -->
 							<div v-else class="d-flex align-center justify-center" style="aspect-ratio: 1; background: #f6f6f9;">
 								<v-icon icon="mdi-image-outline" size="32" color="grey"></v-icon>
 							</div>
@@ -522,6 +526,11 @@ const Home = {
 		function formatNumber(n) {
 			return Number(n || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 		}
+		// 物品图标 URL：优先新模型 (icon_kind/value)，否则回退到老的 cover_url
+		function itemIconUrl(it) {
+			if (it.icon_kind === "3d" || it.icon_kind === "image") return it.icon_value;
+			return it.cover_url || "";
+		}
 
 		async function loadDashboard() {
 			try {
@@ -580,7 +589,7 @@ const Home = {
 			searchVisible, searchKeyword, toggleSearch,
 			sortOpen, sortKey, sortOrder, sortKeyOptions, sortOrderOptions, currentSortLabel,
 			draftSortKey, draftSortOrder, openSort, confirmSort, cancelSort,
-			statusPills, goItem, formatNumber,
+			statusPills, goItem, formatNumber, itemIconUrl,
 			// 批量
 			selectedIds, isSelected, enterBatch, exitBatch, allSelected, toggleSelectAll, onCardClick,
 			// 分类弹窗

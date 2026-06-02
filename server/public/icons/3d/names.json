@@ -1,0 +1,18 @@
+{
+  "_comment": "3D 图标的中文显示名映射。key = 文件名（不含 .png 扩展），value = 中文名。新加 PNG 时在此追加一条；缺映射的文件会自动回退到文件名做显示。",
+
+  "3dicons-bilibili-dynamic-color":     "哔哩哔哩",
+  "3dicons-credit-card-dynamic-color":  "信用卡",
+  "3dicons-facebook-dynamic-color":     "Facebook",
+  "3dicons-google-dynamic-color":       "Google",
+  "3dicons-headphone-dynamic-color":    "耳机",
+  "3dicons-instagram-dynamic-color":    "Instagram",
+  "3dicons-linkedin-dynamic-color":     "领英",
+  "3dicons-qq-dynamic-color":           "QQ",
+  "3dicons-takeway-cup-dynamic-color":  "外卖杯",
+  "3dicons-tiktok-dynamic-color":       "抖音",
+  "3dicons-tools-dynamic-color":        "工具",
+  "3dicons-weibo-dynamic-color":        "微博",
+  "3dicons-x-dynamic-color":            "X",
+  "3dicons-youtube-dynamic-color":      "YouTube"
+}
