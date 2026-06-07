@@ -23,6 +23,9 @@ server/uploads/*
 # ===== Vant 自动生成的类型文件 =====
 web/src/components.d.ts
 
+# ===== Office 临时锁文件 =====
+~$*
+
 # ===== IDE / 系统垃圾文件 =====
 .vscode/
 .idea/

@@ -65,9 +65,28 @@ function verifyJWT(token: string): Record<string, any> | null {
 // 鉴权快捷返回
 const UNAUTHORIZED = { code: 401, message: '未登录或登录已过期' };
 
+// 把 body 里出现的可更新字段拼成 "col1 = $1, col2 = $2" 的 SQL 片段；
+// 没有任何可更新字段时返回 null（调用方据此回 400）。
+function buildSetClause(body: any, fields: string[]) {
+  const sets: any[] = [];
+  for (const k of fields) {
+    if (k in body) sets.push(sql`${sql(k)} = ${body[k]}`);
+  }
+  if (!sets.length) return null;
+  return sets.reduce((acc, s, i) => (i === 0 ? s : sql`${acc}, ${s}`));
+}
+
 // ========== Elysia App ==========
 
 const app = new Elysia()
+  // 全局错误兜底：任何未捕获异常 / 校验失败都回成统一的 {code,message}，
+  // 前端永远只读 body.code，不会再拿到结构不一致的响应。
+  .onError(({ code, error, set }) => {
+    console.error('[API error]', code, (error as any)?.message ?? error);
+    set.status = 200;
+    const c = code === 'VALIDATION' ? 400 : code === 'NOT_FOUND' ? 404 : 500;
+    return { code: c, message: (error as any)?.message ?? '服务器错误' };
+  })
   .use(cors({ origin: '*' }))
   .use(staticPlugin({ assets: PUBLIC_DIR,  prefix: '/public'  }))
   .use(staticPlugin({ assets: UPLOADS_DIR, prefix: '/uploads' }))
@@ -200,7 +219,8 @@ const app = new Elysia()
         img.url AS cover_url,
         GREATEST((CURRENT_DATE - i.acquisition_date)::int, 1) AS days_owned,
         ROUND(
-          (i.purchase_price + COALESCE(extra.amount, 0))
+          (i.purchase_price + COALESCE(extra.amount, 0)
+           + COALESCE((SELECT SUM(price) FROM sub_items WHERE parent_id = i.id), 0))
           / GREATEST((CURRENT_DATE - i.acquisition_date)::int, 1),
           2
         ) AS daily_cost,
@@ -265,15 +285,17 @@ const app = new Elysia()
   .post('/api/items', async ({ body, userId }) => {
     if (!userId) return UNAUTHORIZED;
     const b = body as any;
+    if (!b.name || !String(b.name).trim()) {
+      return { code: 400, message: '物品名称不能为空' };
+    }
     const inserted = await sql`
       INSERT INTO items (
         name, category, acquisition_date, purchase_price, currency, status, notes, user_id,
-        target_cost_type, target_cost_value, exclude_from_assets, exclude_from_daily,
-        expire_date, expire_reminder, is_wish,
+        exclude_from_assets, exclude_from_daily, is_wish,
         icon_kind, icon_value
       )
       VALUES (
-        ${b.name},
+        ${String(b.name).trim()},
         ${b.category ?? null},
         ${b.acquisition_date ?? new Date().toISOString().slice(0, 10)},
         ${b.purchase_price ?? 0},
@@ -281,12 +303,8 @@ const app = new Elysia()
         ${b.status ?? 'using'},
         ${b.notes ?? null},
         ${userId},
-        ${b.target_cost_type ?? 'none'},
-        ${b.target_cost_value ?? null},
         ${b.exclude_from_assets ?? false},
         ${b.exclude_from_daily ?? false},
-        ${b.expire_date ?? null},
-        ${b.expire_reminder ?? false},
         ${b.is_wish ?? false},
         ${b.icon_kind ?? null},
         ${b.icon_value ?? null}
@@ -312,16 +330,12 @@ const app = new Elysia()
     // 动态字段构造：'key' in b 才更新；传 null 会真的写入 NULL（不再被 COALESCE 跳过）
     const PATCHABLE = [
       'name','category','acquisition_date','purchase_price','currency','status',
-      'cover_image_id','notes','target_cost_type','target_cost_value',
-      'exclude_from_assets','exclude_from_daily','expire_date','expire_reminder','is_wish',
+      'cover_image_id','notes',
+      'exclude_from_assets','exclude_from_daily','is_wish',
       'icon_kind','icon_value',
     ];
-    const sets: any[] = [];
-    for (const k of PATCHABLE) {
-      if (k in b) sets.push(sql`${sql(k)} = ${b[k]}`);
-    }
-    if (!sets.length) return { code: 400, message: '没有字段需要更新' };
-    const setClause = sets.reduce((acc, s, i) => i === 0 ? s : sql`${acc}, ${s}`);
+    const setClause = buildSetClause(b, PATCHABLE);
+    if (!setClause) return { code: 400, message: '没有字段需要更新' };
     const [row] = await sql`
       UPDATE items SET ${setClause}
       WHERE id = ${id} AND user_id = ${userId}
@@ -339,6 +353,30 @@ const app = new Elysia()
     `;
     if (rows.length === 0) return { code: 404, message: 'Item not found' };
     return { code: 200, data: { deleted: rows.length } };
+  })
+
+  // 心愿 → 资产：翻转 is_wish=false、以今天为购入日、生成购入事件
+  .post('/api/items/:id/acquire', async ({ params, body, userId }) => {
+    if (!userId) return UNAUTHORIZED;
+    const id = Number(params.id);
+    const b = (body ?? {}) as any;
+    const [item] = await sql`SELECT * FROM items WHERE id = ${id} AND user_id = ${userId}`;
+    if (!item) return { code: 404, message: 'Item not found' };
+    if (!item.is_wish) return { code: 400, message: '该物品已是资产' };
+    const acqDate = b.acquisition_date ?? new Date().toISOString().slice(0, 10);
+    const price   = b.purchase_price ?? item.purchase_price;
+    const [row] = await sql`
+      UPDATE items
+      SET is_wish = false, status = 'using',
+          acquisition_date = ${acqDate}, purchase_price = ${price}
+      WHERE id = ${id} AND user_id = ${userId}
+      RETURNING *
+    `;
+    await sql`
+      INSERT INTO events (item_id, type, occurred_at, amount, description)
+      VALUES (${id}, 'purchase', ${acqDate}, ${price}, '购入')
+    `;
+    return { code: 200, data: row };
   })
 
   // ========== Events（通过 item_id 间接校验所属用户）==========
@@ -400,6 +438,7 @@ const app = new Elysia()
         GREATEST((CURRENT_DATE - i.acquisition_date)::int, 1) AS days_owned,
         COALESCE(SUM(CASE WHEN e.type IN ('repair','maintenance','consumable')
                           THEN e.amount END), 0) AS extra_cost,
+        COALESCE((SELECT SUM(price) FROM sub_items WHERE parent_id = i.id), 0) AS sub_cost,
         COALESCE(SUM(CASE WHEN e.type = 'usage' THEN e.quantity END), 0) AS use_count
       FROM items i
       LEFT JOIN events e ON e.item_id = i.id
@@ -407,7 +446,7 @@ const app = new Elysia()
       GROUP BY i.id
     `;
     if (!stats) return { code: 404, message: 'Item not found' };
-    const total = Number(stats.purchase_price) + Number(stats.extra_cost);
+    const total = Number(stats.purchase_price) + Number(stats.extra_cost) + Number(stats.sub_cost);
     const daily_cost   = +(total / Number(stats.days_owned)).toFixed(2);
     const cost_per_use = Number(stats.use_count) > 0
       ? +(total / Number(stats.use_count)).toFixed(2)
@@ -425,7 +464,9 @@ const app = new Elysia()
       SELECT
         COALESCE(SUM(
           CASE WHEN status <> 'sold' AND exclude_from_assets = false
-               THEN purchase_price END
+               THEN purchase_price
+                    + COALESCE((SELECT SUM(price) FROM sub_items WHERE parent_id = items.id), 0)
+               END
         ), 0)::numeric AS total_assets,
         COUNT(*)::int                                                      AS total_count,
         SUM(CASE WHEN status = 'using'   THEN 1 ELSE 0 END)::int           AS count_using,
@@ -438,7 +479,8 @@ const app = new Elysia()
     const dailyRows = await sql`
       SELECT
         COALESCE(SUM(
-          (i.purchase_price + COALESCE(extra.amount, 0))
+          (i.purchase_price + COALESCE(extra.amount, 0)
+           + COALESCE((SELECT SUM(price) FROM sub_items WHERE parent_id = i.id), 0))
           / GREATEST((CURRENT_DATE - i.acquisition_date)::int, 1)
         ), 0)::numeric AS daily_cost_sum
       FROM items i
@@ -624,11 +666,8 @@ const app = new Elysia()
     const ids: number[] = Array.isArray(b.ids) ? b.ids.map(Number).filter(Boolean) : [];
     if (!ids.length) return { code: 400, message: 'ids 不能为空' };
 
-    const sets: any[] = [];
-    if ('status'   in b) sets.push(sql`status   = ${b.status}`);
-    if ('category' in b) sets.push(sql`category = ${b.category}`);
-    if (!sets.length) return { code: 400, message: '没有字段需要更新' };
-    const setClause = sets.reduce((acc, s, i) => i === 0 ? s : sql`${acc}, ${s}`);
+    const setClause = buildSetClause(b, ['status', 'category']);
+    if (!setClause) return { code: 400, message: '没有字段需要更新' };
 
     const rows = await sql`
       UPDATE items SET ${setClause}
@@ -729,12 +768,8 @@ const app = new Elysia()
     if (!userId) return UNAUTHORIZED;
     const id = Number(params.id);
     const b = body as any;
-    const sets: any[] = [];
-    if ('name'  in b) sets.push(sql`name  = ${b.name}`);
-    if ('price' in b) sets.push(sql`price = ${b.price}`);
-    if ('notes' in b) sets.push(sql`notes = ${b.notes}`);
-    if (!sets.length) return { code: 400, message: '没有字段需要更新' };
-    const setClause = sets.reduce((acc, s, i) => i === 0 ? s : sql`${acc}, ${s}`);
+    const setClause = buildSetClause(b, ['name', 'price', 'notes']);
+    if (!setClause) return { code: 400, message: '没有字段需要更新' };
     const [row] = await sql`
       UPDATE sub_items SET ${setClause}
       WHERE id = ${id}

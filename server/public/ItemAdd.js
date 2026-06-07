@@ -53,7 +53,7 @@ const ItemAdd = {
 				<v-card class="rounded-xl mb-4" elevation="0" border>
 					<div class="iadd-row">
 						<v-icon icon="mdi-currency-cny" size="20" class="mr-3 text-grey-darken-1"></v-icon>
-						<span class="iadd-label">价格</span>
+						<span class="iadd-label">{{ form.is_wish ? '想买价格' : '价格' }}</span>
 						<input
 							v-model.number="form.purchase_price"
 							type="number"
@@ -70,64 +70,22 @@ const ItemAdd = {
 						<v-icon icon="mdi-chevron-right" size="18" class="ml-1 text-grey"></v-icon>
 					</div>
 					<v-divider class="iadd-divider"></v-divider>
-					<div class="iadd-row">
+					<div class="iadd-row" @click="openCatPicker">
 						<v-icon icon="mdi-tag-outline" size="20" class="mr-3 text-grey-darken-1"></v-icon>
 						<span class="iadd-label">类别</span>
-						<input
-							v-model="form.category"
-							class="iadd-input-right"
-							placeholder="未分类"
-						/>
-						<v-icon icon="mdi-chevron-right" size="18" class="ml-1 text-grey"></v-icon>
-					</div>
-					<v-divider class="iadd-divider"></v-divider>
-					<div class="iadd-row">
-						<v-icon icon="mdi-bookmark-outline" size="20" class="mr-3 text-grey-darken-1"></v-icon>
-						<span class="iadd-label">标签</span>
-						<span class="iadd-value-right text-grey">{{ form.tags || '可选' }}</span>
+						<span class="iadd-value-right" :class="form.category ? '' : 'text-grey'">{{ form.category || '未分类' }}</span>
 						<v-icon icon="mdi-chevron-right" size="18" class="ml-1 text-grey"></v-icon>
 					</div>
 				</v-card>
 
-				<!-- 卡片 2：目标成本 -->
-				<v-card class="rounded-xl mb-4 pa-3" elevation="0" border>
-					<div class="d-flex align-center mb-2">
-						<v-icon icon="mdi-target" size="20" class="mr-2 text-grey-darken-1"></v-icon>
-						<span class="iadd-label flex-grow-1">目标成本</span>
-					</div>
-					<v-btn-toggle
-						v-model="form.target_cost_type"
-						mandatory
-						color="black"
-						density="compact"
-						class="d-flex iadd-target-toggle"
-						rounded="pill"
-					>
-						<v-btn value="none"   class="flex-grow-1">不设定</v-btn>
-						<v-btn value="price"  class="flex-grow-1">按价格</v-btn>
-						<v-btn value="period" class="flex-grow-1">按周期</v-btn>
-						<v-btn value="custom" class="flex-grow-1">自定义</v-btn>
-					</v-btn-toggle>
-					<v-text-field
-						v-if="form.target_cost_type !== 'none'"
-						v-model.number="form.target_cost_value"
-						type="number"
-						step="0.01"
-						:label="targetCostLabel"
-						prefix="¥"
-						variant="outlined"
-						density="comfortable"
-						class="mt-3"
-						hide-details
-					></v-text-field>
-				</v-card>
-
-				<!-- 卡片 3：附加物品 -->
-				<v-card class="rounded-xl mb-4 pa-3" elevation="0" border>
-					<div class="d-flex align-center mb-2">
+				<!-- 卡片 3：附加物品（仅资产模式：心愿还没买，谈不上配件/耗材成本）-->
+				<v-card v-if="!form.is_wish" class="rounded-xl mb-4 pa-3" elevation="0" border>
+					<div class="d-flex align-center mb-1">
 						<v-icon icon="mdi-package-variant-closed-plus" size="20" class="mr-2 text-grey-darken-1"></v-icon>
-						<span class="iadd-label">附加物品</span>
+						<span class="iadd-label flex-grow-1">附加物品</span>
+						<span v-if="subTotal > 0" class="text-caption text-grey-darken-1">小计 ¥{{ subTotal.toFixed(2) }}</span>
 					</div>
+					<div class="text-caption text-grey mb-2">配件 / 耗材的花费会计入这件物品的总成本</div>
 					<div v-for="(s, idx) in form.sub_items" :key="idx" class="d-flex align-center mb-2" style="gap: 8px;">
 						<input v-model="s.name" class="iadd-sub-name" placeholder="配件名" />
 						<input v-model.number="s.price" type="number" step="0.01" class="iadd-sub-price" placeholder="¥0" />
@@ -155,8 +113,8 @@ const ItemAdd = {
 					></v-textarea>
 				</v-card>
 
-				<!-- 卡片 5：4 个开关 -->
-				<v-card class="rounded-xl mb-4" elevation="0" border>
+				<!-- 卡片 5：资产开关（仅资产模式：心愿不计资产/日均，也无所谓退役/卖出）-->
+				<v-card v-if="!form.is_wish" class="rounded-xl mb-4" elevation="0" border>
 					<div class="iadd-row">
 						<v-icon icon="mdi-cash-remove" size="20" class="mr-3 text-grey-darken-1"></v-icon>
 						<span class="iadd-label flex-grow-1">不计入总资产</span>
@@ -179,24 +137,6 @@ const ItemAdd = {
 						<v-icon icon="mdi-swap-horizontal" size="20" class="mr-3 text-grey-darken-1"></v-icon>
 						<span class="iadd-label flex-grow-1">已卖出</span>
 						<v-switch v-model="soldSwitch" color="pink-lighten-1" hide-details density="compact" inset></v-switch>
-					</div>
-				</v-card>
-
-				<!-- 卡片 6：到期设置 -->
-				<v-card class="rounded-xl mb-4" elevation="0" border>
-					<div class="d-flex align-center px-4 pt-3 pb-1">
-						<v-icon icon="mdi-clock-outline" size="20" class="mr-2 text-grey-darken-1"></v-icon>
-						<span class="iadd-label">到期设置</span>
-					</div>
-					<div class="iadd-row" @click="expireDateOpen = true">
-						<span class="iadd-label flex-grow-1" style="margin-left: 32px;">到期时间</span>
-						<span class="iadd-value-right text-grey">{{ form.expire_date || '未设置' }}</span>
-						<v-icon icon="mdi-chevron-right" size="18" class="ml-1 text-grey"></v-icon>
-					</div>
-					<v-divider class="iadd-divider"></v-divider>
-					<div class="iadd-row">
-						<span class="iadd-label flex-grow-1" style="margin-left: 32px;">到期提醒</span>
-						<v-switch v-model="form.expire_reminder" color="pink-lighten-1" hide-details density="compact" inset :disabled="!form.expire_date"></v-switch>
 					</div>
 				</v-card>
 
@@ -228,14 +168,44 @@ const ItemAdd = {
 				></v-date-picker>
 			</v-dialog>
 
-			<!-- 到期日期 -->
-			<v-dialog v-model="expireDateOpen" max-width="380">
-				<v-date-picker
-					v-model="expireDateValue"
-					title="选择到期日期"
-					color="pink-lighten-1"
-					@update:model-value="onExpireDateConfirm"
-				></v-date-picker>
+			<!-- 分类选择器：选已有 / 新建 -->
+			<v-dialog v-model="catPickerOpen" max-width="420">
+				<v-card class="rounded-xl pa-4">
+					<div class="text-subtitle-1 font-weight-bold mb-3">选择分类</div>
+					<v-text-field
+						v-model="catSearch"
+						placeholder="输入以搜索或新建分类"
+						variant="outlined"
+						density="comfortable"
+						prepend-inner-icon="mdi-magnify"
+						hide-details
+						@keyup.enter="confirmNewCat"
+					></v-text-field>
+					<v-btn
+						v-if="canCreateCat"
+						block
+						variant="tonal"
+						color="pink-lighten-1"
+						rounded="lg"
+						class="mt-3"
+						prepend-icon="mdi-plus"
+						@click="confirmNewCat"
+					>新建分类「{{ catSearch.trim() }}」</v-btn>
+					<div class="d-flex flex-wrap mt-3" style="gap: 8px;">
+						<v-chip
+							v-for="c in filteredCats"
+							:key="c.name"
+							:color="form.category === c.name ? 'pink-lighten-1' : undefined"
+							:variant="form.category === c.name ? 'flat' : 'outlined'"
+							@click="pickCategory(c.name)"
+						>{{ c.name }} <span class="text-caption ml-1">({{ c.count }})</span></v-chip>
+						<v-chip
+							:color="!form.category ? 'pink-lighten-1' : undefined"
+							:variant="!form.category ? 'flat' : 'outlined'"
+							@click="pickCategory('')"
+						>未分类</v-chip>
+					</div>
+				</v-card>
 			</v-dialog>
 
 			<!-- ===== 图标选择器（三 tab）===== -->
@@ -318,18 +288,13 @@ const ItemAdd = {
 		const form = reactive({
 			name: "",
 			category: "",
-			tags: "",                  // 预留字段，标签弹窗以后做
 			notes: "",
 			acquisition_date: new Date().toISOString().slice(0, 10),
-			purchase_price: 0,
+			purchase_price: "",   // 空串：显示 placeholder「0」，不会顶一个 0 在前面
 			status: "using",
 			is_wish: false,
-			target_cost_type: "none",
-			target_cost_value: null,
 			exclude_from_assets: false,
 			exclude_from_daily:  false,
-			expire_date:     null,
-			expire_reminder: false,
 			sub_items: [],
 			icon_kind:  null,   // 'emoji' | '3d' | 'image' | null
 			icon_value: null,   // emoji 字符 / 图标 URL / 上传后填充
@@ -351,15 +316,55 @@ const ItemAdd = {
 			},
 		});
 
-		const targetCostLabel = computed(() => {
-			return form.target_cost_type === "price"  ? "目标总价" :
-			       form.target_cost_type === "period" ? "目标周期天数" :
-			       form.target_cost_type === "custom" ? "目标值" : "";
+		// 附加物品小计（实时）
+		const subTotal = computed(() =>
+			form.sub_items.reduce((sum, s) => sum + (Number(s.price) || 0), 0)
+		);
+
+		// ===== 分类选择器 =====
+		const catPickerOpen = ref(false);
+		const catSearch     = ref("");
+		const categories    = ref([]);   // [{name, count}]
+		const filteredCats = computed(() => {
+			const kw = catSearch.value.trim().toLowerCase();
+			return categories.value
+				.filter(c => c.name !== "未分类")
+				.filter(c => !kw || c.name.toLowerCase().includes(kw));
 		});
+		// 输入的名字在已有分类里找不到 → 可新建
+		const canCreateCat = computed(() => {
+			const kw = catSearch.value.trim();
+			if (!kw || kw === "未分类") return false;
+			return !categories.value.some(c => c.name === kw);
+		});
+		async function openCatPicker() {
+			catPickerOpen.value = true;
+			catSearch.value = "";
+			try {
+				const r = await authFetch("/api/categories");
+				const j = await r.json();
+				if (j.code === 200) categories.value = j.data;
+			} catch { /* ignore */ }
+		}
+		function pickCategory(name) {
+			form.category = name;          // '' 表示未分类
+			catPickerOpen.value = false;
+		}
+		function confirmNewCat() {
+			if (!canCreateCat.value) return;
+			pickCategory(catSearch.value.trim());
+		}
 
 		// ===== 图标选择器 =====
 		const coverInput     = ref(null);
 		const coverFile      = ref(null);     // album tab 选的本地文件（待 submit 时上传）
+		const coverBlobUrl   = ref("");       // 本地文件预览用的 blob URL（建一次，销毁时 revoke）
+		// 释放旧 blob URL，避免每次预览都 createObjectURL 造成内存泄漏
+		function setCoverFile(f) {
+			if (coverBlobUrl.value) { URL.revokeObjectURL(coverBlobUrl.value); coverBlobUrl.value = ""; }
+			coverFile.value = f;
+			if (f) coverBlobUrl.value = URL.createObjectURL(f);
+		}
 		const iconPickerOpen = ref(false);
 		const iconTab        = ref("3d");     // 默认打开 3D 那 tab
 		const icons3d        = ref([]);
@@ -382,8 +387,8 @@ const ItemAdd = {
 		// 显示用：把 form.icon_kind/value + 本地新选的文件 + 编辑模式原 cover_url 三合一
 		const iconPreview = computed(() => {
 			if (form.icon_kind === "image") {
-				// 新选的本地文件，用 blob URL 预览；老物品 (无 coverFile) 用 icon_value 里的 URL
-				if (coverFile.value) return URL.createObjectURL(coverFile.value);
+				// 新选的本地文件，用已建好的 blob URL 预览；老物品 (无 coverFile) 用 icon_value 里的 URL
+				if (coverFile.value) return coverBlobUrl.value;
 				return form.icon_value || "";
 			}
 			if (form.icon_kind === "3d") return form.icon_value || "";
@@ -409,7 +414,7 @@ const ItemAdd = {
 			e.target.value = "";
 			if (!f) return;
 			if (!f.type.startsWith("image/")) { tip("请选择图片", "error"); return; }
-			coverFile.value     = f;
+			setCoverFile(f);
 			form.icon_kind      = "image";
 			form.icon_value     = null;  // 真正的 URL 等上传完才有
 			// 选完立即关闭弹窗，让用户看到大图预览
@@ -418,13 +423,13 @@ const ItemAdd = {
 		function pickEmoji(e) {
 			form.icon_kind  = "emoji";
 			form.icon_value = e;
-			coverFile.value = null;
+			setCoverFile(null);
 			iconPickerOpen.value = false;
 		}
 		function pick3d(icon) {
 			form.icon_kind  = "3d";
 			form.icon_value = icon.url;
-			coverFile.value = null;
+			setCoverFile(null);
 			iconPickerOpen.value = false;
 		}
 
@@ -438,18 +443,9 @@ const ItemAdd = {
 			}
 			dateOpen.value = false;
 		}
-		const expireDateOpen  = ref(false);
-		const expireDateValue = ref(new Date());
-		function onExpireDateConfirm(d) {
-			if (d instanceof Date) {
-				form.expire_date = d.toISOString().slice(0, 10);
-				expireDateValue.value = d;
-			}
-			expireDateOpen.value = false;
-		}
 
 		// 附加物品
-		function addSubItem() { form.sub_items.push({ name: "", price: 0 }); }
+		function addSubItem() { form.sub_items.push({ name: "", price: "" }); }
 		function removeSubItem(idx) {
 			// 已存在于后端的子项需要 DELETE
 			const s = form.sub_items[idx];
@@ -486,28 +482,24 @@ const ItemAdd = {
 			return j.code === 200 ? j.data : null;
 		}
 
-		// 同步 sub_items 到后端（add / patch / delete）
+		// 同步 sub_items 到后端（add / patch / delete）—— 各项互不依赖，并发执行
 		async function syncSubItems(itemId) {
+			const jobs = [];
 			// 删除被移除的
 			for (const sid of deletedSubIds.value) {
-				await authFetch("/api/sub-items/" + sid, { method: "DELETE" });
+				jobs.push(authFetch("/api/sub-items/" + sid, { method: "DELETE" }));
 			}
 			deletedSubIds.value = [];
 			// 创建或更新
 			for (const s of form.sub_items) {
 				if (!s.name || !s.name.trim()) continue;
-				if (s.id) {
-					await authFetch("/api/sub-items/" + s.id, {
-						method: "PATCH",
-						json: { name: s.name.trim(), price: Number(s.price) || 0 },
-					});
-				} else {
-					await authFetch("/api/items/" + itemId + "/sub-items", {
-						method: "POST",
-						json: { name: s.name.trim(), price: Number(s.price) || 0 },
-					});
-				}
+				const json = { name: s.name.trim(), price: Number(s.price) || 0 };
+				jobs.push(s.id
+					? authFetch("/api/sub-items/" + s.id, { method: "PATCH", json })
+					: authFetch("/api/items/" + itemId + "/sub-items", { method: "POST", json })
+				);
 			}
+			await Promise.all(jobs);
 		}
 
 		async function loadForEdit() {
@@ -523,15 +515,10 @@ const ItemAdd = {
 			form.purchase_price   = Number(it.purchase_price ?? 0);
 			form.status           = it.status || "using";
 			form.is_wish          = !!it.is_wish;
-			form.target_cost_type   = it.target_cost_type   || "none";
-			form.target_cost_value  = it.target_cost_value !== null && it.target_cost_value !== undefined ? Number(it.target_cost_value) : null;
 			form.exclude_from_assets = !!it.exclude_from_assets;
 			form.exclude_from_daily  = !!it.exclude_from_daily;
-			form.expire_date     = it.expire_date ? String(it.expire_date).slice(0, 10) : null;
-			form.expire_reminder = !!it.expire_reminder;
 			form.sub_items       = (it.sub_items || []).map(s => ({ id: s.id, name: s.name, price: Number(s.price) }));
 			if (form.acquisition_date) dateValue.value = new Date(form.acquisition_date);
-			if (form.expire_date)      expireDateValue.value = new Date(form.expire_date);
 			// 图标预填：优先用 icon_kind/value（新模型），否则回退到 cover_url（老模型）
 			if (it.icon_kind && it.icon_value) {
 				form.icon_kind  = it.icon_kind;
@@ -562,12 +549,8 @@ const ItemAdd = {
 					status: form.status,
 					notes: form.notes.trim() || null,
 					is_wish: form.is_wish,
-					target_cost_type:  form.target_cost_type,
-					target_cost_value: form.target_cost_type === "none" ? null : (Number(form.target_cost_value) || 0),
 					exclude_from_assets: form.exclude_from_assets,
 					exclude_from_daily:  form.exclude_from_daily,
-					expire_date:     form.expire_date,
-					expire_reminder: !!form.expire_date && form.expire_reminder,
 					// 图标：emoji / 3d 类型直接进 payload；image 类型在下面上传完才有 url
 					icon_kind:  (form.icon_kind === "image" && coverFile.value) ? null : form.icon_kind,
 					icon_value: (form.icon_kind === "image" && coverFile.value) ? null : form.icon_value,
@@ -615,17 +598,22 @@ const ItemAdd = {
 
 		onMounted(() => {
 			if (isEdit.value) loadForEdit();
+			// 从心愿库点「+」进来：默认开在「心愿」模式
+			else if (route.query.wish === "1") form.is_wish = true;
 		});
+		// 离开页面时释放未提交的 blob 预览 URL
+		onUnmounted(() => { if (coverBlobUrl.value) URL.revokeObjectURL(coverBlobUrl.value); });
 
 		return {
 			isEdit, submitting, form,
 			retiredSwitch, soldSwitch,
-			targetCostLabel, canSave,
+			canSave, subTotal,
+			catPickerOpen, catSearch, filteredCats, canCreateCat,
+			openCatPicker, pickCategory, confirmNewCat,
 			coverInput, iconPreview,
 			iconPickerOpen, iconTab, EMOJI_SET, icons3d, loading3d,
 			openIconPicker, triggerAlbum, onAlbumPick, pickEmoji, pick3d,
 			dateOpen, dateValue, onDateConfirm,
-			expireDateOpen, expireDateValue, onExpireDateConfirm,
 			addSubItem, removeSubItem,
 			snackbar,
 			handleSubmit, handleCancel,

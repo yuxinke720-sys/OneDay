@@ -59,6 +59,19 @@ const ItemDetail = {
 					</div>
 				</v-card>
 
+				<!-- 附加物品清单（计入总成本）-->
+				<v-card v-if="item.sub_items && item.sub_items.length" class="pa-4 mt-4 rounded-xl" elevation="0" border>
+					<div class="d-flex align-center mb-2">
+						<v-icon icon="mdi-package-variant-closed-plus" size="18" class="mr-2 text-grey-darken-1"></v-icon>
+						<span class="text-subtitle-2 font-weight-bold flex-grow-1">附加物品</span>
+						<span class="text-caption text-grey-darken-1">小计 ¥{{ subTotal.toFixed(2) }}</span>
+					</div>
+					<div v-for="s in item.sub_items" :key="s.id" class="d-flex align-center justify-space-between py-1">
+						<span class="text-body-2">{{ s.name }}</span>
+						<span class="text-body-2 text-grey-darken-1">¥{{ Number(s.price).toFixed(2) }}</span>
+					</div>
+				</v-card>
+
 				<!-- 今天用了 一键按钮 -->
 				<v-btn
 					v-if="item.status === 'using'"
@@ -157,6 +170,11 @@ const ItemDetail = {
 		const item   = ref(null);
 		const events = ref([]);
 		const stats  = ref(null);
+
+		// 附加物品小计（计入总成本）
+		const subTotal = computed(() =>
+			(item.value?.sub_items || []).reduce((sum, s) => sum + (Number(s.price) || 0), 0)
+		);
 
 		const cover = computed(() => {
 			if (!item.value) return "";
@@ -272,7 +290,7 @@ const ItemDetail = {
 		onMounted(loadAll);
 
 		return {
-			item, events, stats, cover, statusColor, statusLabel,
+			item, events, stats, cover, subTotal, statusColor, statusLabel,
 			eventMeta, formatDate, snackbar,
 			quickUsing, quickUse, onDeleteEvent,
 			eventModalOpen, adding, addableTypes, newEvent, submitEvent,
