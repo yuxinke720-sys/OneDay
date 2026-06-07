@@ -23,7 +23,8 @@ const Register = {
 							density="comfortable"
 							:rules="[
 								v => !!v || '学号不能为空',
-								v => /^S\\d+$/.test(v) || '学号需以 S 开头后跟数字',
+								v => (v && v.length >= 5) || '学号长度不能少于 5 位',
+								v => /^S\\d+$/.test(v) || '学号必须以 S 开头，后跟数字',
 							]"
 							:disabled="loading"
 						></v-text-field>
@@ -34,7 +35,10 @@ const Register = {
 							prepend-inner-icon="mdi-account-outline"
 							variant="outlined"
 							density="comfortable"
-							:rules="[v => !!v || '姓名不能为空']"
+							:rules="[
+								v => !!v || '姓名不能为空',
+								v => (v && v.length <= 20) || '姓名长度不能超过 20 位',
+							]"
 							:disabled="loading"
 						></v-text-field>
 
@@ -67,21 +71,55 @@ const Register = {
 							:disabled="loading"
 						></v-text-field>
 
+						<v-select
+							v-model="form.gender"
+							label="性别"
+							:items="genderOptions"
+							item-title="label"
+							item-value="value"
+							prepend-inner-icon="mdi-gender-male-female"
+							variant="outlined"
+							density="comfortable"
+							:rules="[v => !!v || '性别不能为空']"
+							:disabled="loading"
+						></v-select>
+
+						<v-text-field
+							v-model="form.birthday"
+							label="出生日期"
+							type="date"
+							prepend-inner-icon="mdi-calendar-outline"
+							variant="outlined"
+							density="comfortable"
+							:rules="[v => !!v || '出生日期不能为空']"
+							:disabled="loading"
+						></v-text-field>
+
 						<v-text-field
 							v-model="form.email"
-							label="邮箱（可选）"
+							label="邮箱"
+							placeholder="请输入邮箱地址"
 							prepend-inner-icon="mdi-email-outline"
 							variant="outlined"
 							density="comfortable"
+							:rules="[
+								v => !!v || '邮箱不能为空',
+								v => /^[\\w-]+(\\.[\\w-]+)*@([\\w-]+\\.)+[a-zA-Z]{2,7}$/.test(v) || '邮箱格式不正确',
+							]"
 							:disabled="loading"
 						></v-text-field>
 
 						<v-text-field
 							v-model="form.phone"
-							label="手机（可选）"
+							label="手机号"
+							placeholder="请输入 11 位手机号"
 							prepend-inner-icon="mdi-phone-outline"
 							variant="outlined"
 							density="comfortable"
+							:rules="[
+								v => !!v || '手机号不能为空',
+								v => /^1[3-9]\\d{9}$/.test(v) || '手机号格式不正确（11 位数字）',
+							]"
 							:disabled="loading"
 						></v-text-field>
 
@@ -119,8 +157,14 @@ const Register = {
 		const loading   = ref(false);
 		const showPwd   = ref(false);
 		const form = reactive({
-			studentId: "", name: "", password: "", password2: "", email: "", phone: "",
+			studentId: "", name: "", password: "", password2: "",
+			gender: "", birthday: "", email: "", phone: "",
 		});
+		const genderOptions = [
+			{ label: "男",   value: "M" },
+			{ label: "女",   value: "F" },
+			{ label: "其他", value: "O" },
+		];
 		const snack = reactive({ show: false, msg: "", color: "success" });
 
 		function tip(msg, color = "success") {
@@ -143,10 +187,10 @@ const Register = {
 					body: JSON.stringify({
 						studentId: form.studentId,
 						name:      form.name,
-						gender:    "O",
-						birthday:  null,
-						email:     form.email || null,
-						phone:     form.phone || null,
+						gender:    form.gender,
+						birthday:  form.birthday,
+						email:     form.email,
+						phone:     form.phone,
 						password:  encryptedPwd,
 						isadmin:   false,
 					}),
@@ -163,6 +207,6 @@ const Register = {
 			}
 		}
 
-		return { formRef, formValid, loading, showPwd, form, snack, handleRegister, goLogin };
+		return { formRef, formValid, loading, showPwd, form, genderOptions, snack, handleRegister, goLogin };
 	},
 };

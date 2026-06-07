@@ -618,12 +618,6 @@ const app = new Elysia()
     return { code: 200, data: { deleted: 1 } };
   })
 
-  // ========== Tags（标签字典，跨用户共享）==========
-  .get('/api/tags', async () => {
-    const rows = await sql`SELECT * FROM tags ORDER BY name`;
-    return { code: 200, data: rows };
-  })
-
   // ========== 3D 图标列表（扫 public/icons/3d/ 目录 + 合并 names.json）==========
   .get('/api/icons/3d', async () => {
     const dir = join(PUBLIC_DIR, 'icons', '3d');

@@ -82,22 +82,7 @@ async function initDatabase() {
         FOREIGN KEY (cover_image_id) REFERENCES images(id) ON DELETE SET NULL
     `;
 
-    // ===== 6. tags + item_tags =====
-    await sql`
-      CREATE TABLE tags (
-        id    BIGSERIAL    PRIMARY KEY,
-        name  VARCHAR(30)  UNIQUE NOT NULL
-      )
-    `;
-    await sql`
-      CREATE TABLE item_tags (
-        item_id BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        tag_id  BIGINT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
-        PRIMARY KEY (item_id, tag_id)
-      )
-    `;
-
-    // ===== 7. updated_at 自动触发器 =====
+    // ===== updated_at 自动触发器 =====
     await sql`
       CREATE OR REPLACE FUNCTION trg_set_updated_at() RETURNS trigger AS $$
       BEGIN NEW.updated_at = now(); RETURN NEW; END;

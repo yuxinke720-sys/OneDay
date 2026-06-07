@@ -3,7 +3,7 @@
 //
 // 适用两种场景：
 //   1) 全新 Win 机器（只有 student-servertest-main 留下的 students 表）：
-//      → 自动建 items / events / images / tags / item_tags / sub_items 表
+//      → 自动建 items / events / images / sub_items 表
 //      → 加 OneDay 自己需要的所有新字段
 //      → 建 admin 账号
 //   2) 老 OneDay 机器：
@@ -86,20 +86,10 @@ async function main() {
     await sql`CREATE INDEX IF NOT EXISTS idx_images_item  ON images(item_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_images_event ON images(event_id)`;
 
-    await sql`
-      CREATE TABLE IF NOT EXISTS tags (
-        id    BIGSERIAL    PRIMARY KEY,
-        name  VARCHAR(30)  UNIQUE NOT NULL
-      )
-    `;
-    await sql`
-      CREATE TABLE IF NOT EXISTS item_tags (
-        item_id  BIGINT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-        tag_id   BIGINT NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
-        PRIMARY KEY (item_id, tag_id)
-      )
-    `;
-    console.log('  ✓ event_type / items / events / images / tags / item_tags\n');
+    // tags / item_tags 已废弃（标签功能未实现，与分类重叠）——存在则删除
+    await sql`DROP TABLE IF EXISTS item_tags CASCADE`;
+    await sql`DROP TABLE IF EXISTS tags      CASCADE`;
+    console.log('  ✓ event_type / items / events / images / sub_items（已移除废弃的 tags/item_tags）\n');
 
     // ============================================================
     // 1. students 表补列（共用 student_db；password/isadmin 可能由

@@ -21,7 +21,10 @@ const Login = {
 							prepend-inner-icon="mdi-account-outline"
 							variant="outlined"
 							density="comfortable"
-							:rules="[v => !!v || '学号不能为空']"
+							:rules="[
+								v => !!v || '学号不能为空',
+								v => /^S\\d+$/.test(v) || '学号必须以 S 开头，后跟数字',
+							]"
 							autocomplete="username"
 							:disabled="loading"
 						></v-text-field>
@@ -38,6 +41,7 @@ const Login = {
 							:rules="[
 								v => !!v || '密码不能为空',
 								v => (v && v.length >= 6) || '密码至少 6 位',
+								v => (v && v.length <= 20) || '密码不超过 20 位',
 							]"
 							autocomplete="current-password"
 							:disabled="loading"
