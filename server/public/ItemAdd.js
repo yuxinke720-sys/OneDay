@@ -147,16 +147,34 @@ const ItemAdd = {
 
 			<!-- 底部固定按钮 -->
 			<div class="iadd-bottom-bar">
-				<div v-if="isEdit" class="d-flex" style="gap: 12px;">
-					<v-btn class="flex-grow-1" size="large" variant="outlined" rounded="pill" :disabled="submitting" @click="handleCancel">取消</v-btn>
-					<v-btn class="flex-grow-1" size="large" color="black" rounded="pill" :loading="submitting" :disabled="!canSave" @click="handleSubmit">
-						<v-icon icon="mdi-content-save-outline" class="mr-1"></v-icon>保存
+				<div v-if="isEdit" class="d-flex flex-column" style="gap: 10px;">
+					<div class="d-flex" style="gap: 12px;">
+						<v-btn class="flex-grow-1" size="large" variant="outlined" rounded="pill" :disabled="submitting" @click="handleCancel">取消</v-btn>
+						<v-btn class="flex-grow-1" size="large" color="black" rounded="pill" :loading="submitting" :disabled="!canSave" @click="handleSubmit">
+							<v-icon icon="mdi-content-save-outline" class="mr-1"></v-icon>保存
+						</v-btn>
+					</div>
+					<v-btn variant="text" color="error" :disabled="submitting" @click="deleteOpen = true">
+						<v-icon icon="mdi-trash-can-outline" class="mr-1"></v-icon>删除物品
 					</v-btn>
 				</div>
 				<v-btn v-else block size="large" color="black" rounded="pill" :loading="submitting" :disabled="!canSave" @click="handleSubmit">
 					保存
 				</v-btn>
 			</div>
+
+			<!-- 删除确认 -->
+			<v-dialog v-model="deleteOpen" max-width="340">
+				<v-card rounded="xl">
+					<v-card-title class="text-h6 pt-5">确认删除？</v-card-title>
+					<v-card-text>将永久删除「{{ form.name || '该物品' }}」及其全部事件、图片与附加物品，且不可恢复。</v-card-text>
+					<v-card-actions class="px-4 pb-4">
+						<v-spacer></v-spacer>
+						<v-btn variant="text" :disabled="deleting" @click="deleteOpen = false">取消</v-btn>
+						<v-btn color="error" variant="flat" rounded="pill" :loading="deleting" @click="handleDelete">删除</v-btn>
+					</v-card-actions>
+				</v-card>
+			</v-dialog>
 
 			<!-- 购买/想买日期 -->
 			<v-dialog v-model="dateOpen" max-width="380">
@@ -537,6 +555,25 @@ const ItemAdd = {
 			}
 		}
 
+		// 删除物品（编辑模式）：DELETE 后外键 ON DELETE CASCADE 自动级联事件/图片/子物品
+		const deleteOpen = ref(false);
+		const deleting   = ref(false);
+		async function handleDelete() {
+			deleting.value = true;
+			try {
+				const r = await authFetch("/api/items/" + editId.value, { method: "DELETE" });
+				const j = await r.json();
+				if (j.code !== 200) throw new Error(j.message || "删除失败");
+				deleteOpen.value = false;
+				tip("已删除");
+				setTimeout(() => router.replace({ name: "home" }), 400);
+			} catch (e) {
+				tip(e.message || "删除失败", "error");
+			} finally {
+				deleting.value = false;
+			}
+		}
+
 		async function handleSubmit() {
 			if (!canSave.value) { tip("请输入名称", "error"); return; }
 			submitting.value = true;
@@ -617,6 +654,7 @@ const ItemAdd = {
 			addSubItem, removeSubItem,
 			snackbar,
 			handleSubmit, handleCancel,
+			deleteOpen, deleting, handleDelete,
 		};
 	},
 };
