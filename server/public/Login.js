@@ -73,6 +73,24 @@ const Login = {
 							:disabled="!formValid || loading"
 							@click="handleLogin"
 						>登 录</v-btn>
+
+						<!-- 演示登录：一键填入管理员账号并登录（方便答辩 / 老师检查） -->
+						<v-btn
+							block
+							size="small"
+							variant="tonal"
+							color="grey-darken-1"
+							rounded="lg"
+							class="mt-3"
+							:disabled="loading"
+							@click="demoLogin"
+						>
+							<v-icon icon="mdi-account-key-outline" size="18" class="mr-1"></v-icon>
+							演示登录（管理员）
+						</v-btn>
+						<div class="text-center text-caption text-grey mt-2">
+							演示账号 S20260530 / 密码 123456
+						</div>
 					</v-form>
 				</v-card-text>
 
@@ -104,6 +122,13 @@ const Login = {
 
 		function goRegister() {
 			router.push({ name: "register" });
+		}
+
+		// 一键填入管理员演示账号并登录（迁到新环境 / 老师检查时免去记密码）
+		function demoLogin() {
+			form.studentId = "S20260530";
+			form.password  = "123456";
+			handleLogin();
 		}
 
 		async function handleLogin() {
@@ -147,6 +172,6 @@ const Login = {
 			if (saved) form.studentId = saved;
 		});
 
-		return { formRef, formValid, loading, showPwd, remember, form, snack, handleLogin, goRegister };
+		return { formRef, formValid, loading, showPwd, remember, form, snack, handleLogin, goRegister, demoLogin };
 	},
 };
