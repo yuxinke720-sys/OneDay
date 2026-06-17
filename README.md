@@ -55,32 +55,43 @@ DB_NAME=student_db
 ### 方式 A：导入现成数据（推荐，含结构 + 数据）
 
 适用于「我这边已经有数据，想让新机器/老师拿到一模一样的库」。用 PostgreSQL 自带的
-`pg_dump` / `psql`（便携版在 `...\pgsql\bin` 目录里，先 `cd` 进去再执行）。
+`pg_dump` / `psql`。便携版里双击 **`PgSqlCmd.bat`** 即可打开一个已配好命令路径的控制台
+（`pg_dump` / `psql` / `createdb` 都能直接用，**无需 cd 到 bin 目录**）。
+
+> 前提：先双击 `startPG.bat` 启动 PostgreSQL；下面所有命令在提示 `Password:` 时
+> 输入 postgres 密码（输入时不显示是正常的，打完回车即可）。
 
 **① 导出（在你自己机器上，交作业前做一次）**
 
+双击 `PgSqlCmd.bat`，执行：
+
 ```bat
-cd /d 你的\postgresql...\pgsql\bin
 pg_dump -U postgres -f student_db_backup.sql student_db
 ```
 
-会提示 `Password:`，输入 postgres 密码（输入时不显示）。生成的 `student_db_backup.sql`
-复制到项目文件夹，随代码一并交付。
+生成的 `student_db_backup.sql` 会在 bat 所在目录（一般是 `...\pgsql\bin\`）。
+把它复制到项目文件夹，随代码一并交付。
 
 **② 导入（新机器 / 老师那边做）**
 
+把 `student_db_backup.sql` 放到 `PgSqlCmd.bat` 同一目录，双击它后执行：
+
 ```bat
-cd /d 新机器\postgresql...\pgsql\bin
 createdb -U postgres student_db
-psql -U postgres -d student_db < 路径\student_db_backup.sql
+psql -U postgres -d student_db < student_db_backup.sql
 ```
 
-`createdb` 若提示「already exists」忽略即可，直接跑下一条。
+- `createdb` 若提示「already exists」忽略即可，直接跑下一条。
+- 若 sql 没放在 bat 同目录，第二条要写全路径，例如
+  `psql -U postgres -d student_db < D:\OneDay\student_db_backup.sql`。
 
 **导入方式 A 的优点**：开箱即用（含 admin 账号和真实数据，无需造数据）、结构+数据一次到位、
 可复现、不依赖迁移脚本跑通、纯文本跨机器跨版本、本身也是一份备份。
 
 > ⚠️ 导入后**不要**再执行 `bun run init-db`，否则会 DROP 清空刚导入的数据。
+
+> 没有 `PgSqlCmd.bat` 的环境（如 macOS）：先 `cd` 到 PostgreSQL 的 `bin` 目录，
+> 或确保 `pg_dump`/`psql` 在 PATH 中，再执行上面同样的命令。
 
 ### 方式 B：脚本建库（全新机器、不需要现成数据）
 
